@@ -8,51 +8,212 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #f97316;
+            --primary-dark: #ea580c;
+        }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(to bottom, #0f172a, #1e293b);
+            min-height: 100vh;
+        }
+        
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        progress[value]::-webkit-progress-bar { 
+            background-color: #4a5568; 
+            border-radius: 9999px; 
+        }
+        
+        progress[value]::-webkit-progress-value { 
+            background: linear-gradient(to right, var(--primary), var(--primary-dark)); 
+            border-radius: 9999px; 
+            transition: width 0.1s linear; 
+        }
+        
+        .player-shadow { 
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.5); 
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .episode-card {
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .episode-card:hover {
+            background: linear-gradient(to right, rgba(249, 115, 22, 0.1), rgba(31, 41, 55, 0.8));
+            border-left: 3px solid var(--primary);
+        }
+        
+        .progress-container {
+            position: relative;
+            height: 4px;
+            background-color: #4a5568;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(to right, var(--primary), var(--primary-dark));
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+        
+        .play-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(249, 115, 22, 0.4);
+        }
+        
+        .control-btn {
+            transition: all 0.2s ease;
+        }
+        
+        .control-btn:hover {
+            color: var(--primary);
+            transform: scale(1.1);
+        }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #1e293b 25%, #2d3748 50%, #1e293b 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 8px;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
 </head>
 <body class="text-white">
+    <!-- Header -->
+    <header class="bg-gray-800/80 backdrop-blur-sm py-4 px-6 border-b border-gray-700 sticky top-0 z-10">
+        <div class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center">
+                <i class="fas fa-podcast text-orange-500 mr-3"></i>
+                <span>Podcast App</span>
+            </h1>
+            <div class="flex space-x-4">
+                <button class="p-2 rounded-full hover:bg-gray-700">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button class="p-2 rounded-full hover:bg-gray-700">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+    </header>
 
     <!-- Contenedor principal de la aplicación -->
-    <div id="app-container" class="pb-40"> <!-- Padding bottom para dejar espacio al reproductor -->
+    <div id="app-container" class="pb-40 px-4">
 
         <!-- Vista: Mis Podcasts -->
-        <div id="podcasts-view" class="p-4">
-            <h1 class="text-3xl font-bold mb-6 text-orange-400">Mis Podcasts</h1>
-            <div id="podcasts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div id="podcasts-view" class="py-4">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-orange-500">Mis Podcasts</h1>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 bg-gray-800 rounded-full text-sm">
+                        <i class="fas fa-sort mr-1"></i> Ordenar
+                    </button>
+                    <button class="px-3 py-1 bg-gray-800 rounded-full text-sm">
+                        <i class="fas fa-filter mr-1"></i> Filtros
+                    </button>
+                </div>
+            </div>
+            <div id="podcasts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 <!-- Las carátulas de los podcasts se insertarán aquí al instante -->
             </div>
         </div>
 
         <!-- Vista: Episodios de un Podcast -->
-        <div id="episodes-view" class="hidden p-4 fade-in">
-            <button id="back-to-podcasts" class="mb-4 text-orange-400 font-semibold">&larr; Volver</button>
-            <div id="podcast-header" class="text-center mb-6"></div>
-            <h2 class="text-2xl font-bold mb-4">Episodios</h2>
-            <div id="episodes-list"></div>
+        <div id="episodes-view" class="hidden py-4 fade-in">
+            <button id="back-to-podcasts" class="mb-6 text-orange-400 font-semibold flex items-center">
+                <i class="fas fa-arrow-left mr-2"></i> Volver a podcasts
+            </button>
+            <div id="podcast-header" class="text-center mb-8"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Episodios</h2>
+                <div class="text-sm text-gray-400">
+                    <i class="fas fa-headphones mr-1"></i>
+                    <span id="episodes-count">0</span> episodios
+                </div>
+            </div>
+            <div id="episodes-list" class="space-y-4"></div>
             <div id="episodes-loader" class="text-center py-10">
+                <div class="flex justify-center mb-4">
+                    <i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i>
+                </div>
                 <p>Cargando episodios...</p>
             </div>
-             <div id="episodes-error" class="hidden text-center py-10 bg-red-900/50 rounded-lg">
+             <div id="episodes-error" class="hidden text-center py-10 bg-red-900/30 rounded-lg">
+                <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-3"></i>
                 <p>No se pudo cargar el feed RSS de este podcast.</p>
+                <button class="mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg font-medium">
+                    Reintentar
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Reproductor de Audio Fijo -->
-    <div id="player" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-3 player-shadow fade-in">
-        <div class="flex items-center mb-2">
-            <img id="player-artwork" src="" class="w-14 h-14 rounded-md mr-3 flex-shrink-0" alt="Carátula del episodio">
+    <div id="player" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-lg border-t border-gray-700 p-4 player-shadow fade-in z-20">
+        <div class="flex items-center mb-3">
+            <img id="player-artwork" src="" class="w-14 h-14 rounded-lg mr-3 shadow-md" alt="Carátula del episodio">
             <div class="flex-grow overflow-hidden">
-                <p id="player-episode-title" class="font-bold text-sm truncate"></p>
-                <p id="player-podcast-title" class="text-xs text-gray-400"></p>
+                <p id="player-episode-title" class="font-bold text-sm truncate">Selecciona un episodio</p>
+                <p id="player-podcast-title" class="text-xs text-gray-400 truncate"></p>
             </div>
+            <button id="player-close" class="ml-2 text-gray-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
-         <div class="w-full mb-2">
-            <progress id="player-progress" value="0" max="100" class="w-full h-1.5"></progress>
+        
+        <div class="flex items-center mb-3">
+            <span id="current-time" class="text-xs text-gray-400 w-10">0:00</span>
+            <div class="flex-grow mx-2 relative">
+                <div class="progress-container">
+                    <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+            <span id="duration" class="text-xs text-gray-400 w-10">0:00</span>
         </div>
-        <div class="flex justify-center items-center space-x-6">
-             <button id="player-rewind" class="p-2"></button>
-            <button id="player-play-pause" class="p-2 bg-orange-500 rounded-full"></button>
-             <button id="player-forward" class="p-2"></button>
+        
+        <div class="flex justify-center items-center space-x-8">
+            <button id="player-rewind" class="control-btn text-2xl text-gray-300">
+                <i class="fas fa-step-backward"></i>
+            </button>
+            <button id="player-play-pause" class="play-btn w-12 h-12 rounded-full flex items-center justify-center text-xl">
+                <i class="fas fa-play"></i>
+            </button>
+            <button id="player-forward" class="control-btn text-2xl text-gray-300">
+                <i class="fas fa-step-forward"></i>
+            </button>
         </div>
     </div>
 
@@ -61,21 +222,6 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- INYECTAR CSS CON JS PARA EVITAR ERRORES DE RENDERIZADO ---
-            const styleSheet = document.createElement("style");
-            styleSheet.innerText = `
-                body { font-family: 'Inter', sans-serif; }
-                .fade-in { animation: fadeIn 0.5s ease-in-out; }
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                progress[value]::-webkit-progress-bar { background-color: #4a5568; border-radius: 9999px; }
-                progress[value]::-webkit-progress-value { background-color: #f6ad55; border-radius: 9999px; transition: width 0.1s linear; }
-                .player-shadow { box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.3); }
-            `;
-            document.head.appendChild(styleSheet);
-
             // --- ELEMENTOS DEL DOM ---
             const podcastsView = document.getElementById('podcasts-view');
             const episodesView = document.getElementById('episodes-view');
@@ -85,7 +231,9 @@
             const backToPodcastsBtn = document.getElementById('back-to-podcasts');
             const episodesLoader = document.getElementById('episodes-loader');
             const episodesErrorEl = document.getElementById('episodes-error');
+            const episodesCountEl = document.getElementById('episodes-count');
             const player = document.getElementById('player');
+            const playerCloseBtn = document.getElementById('player-close');
             const audioElement = document.getElementById('audio-element');
             const playerArtwork = document.getElementById('player-artwork');
             const playerEpisodeTitle = document.getElementById('player-episode-title');
@@ -94,9 +242,14 @@
             const playerRewindBtn = document.getElementById('player-rewind');
             const playerForwardBtn = document.getElementById('player-forward');
             const playerProgress = document.getElementById('player-progress');
+            const progressBar = document.getElementById('progress-bar');
+            const currentTimeEl = document.getElementById('current-time');
+            const durationEl = document.getElementById('duration');
 
             // --- DATOS Y ESTADO ---
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+            
+            // DATOS PRE-CARGADOS PARA CARGA INSTANTÁNEA
             const podcasts = [
                 { name: "A dos bandas", rssUrl: "https://www.omnycontent.com/d/playlist/7e594858-42ba-4ecb-86d8-ad1a002e5281/1d39fbf3-b41a-4c54-88ec-adcd0136c774/df3205fa-ee92-4df4-9308-adcd0136c791/podcast.rss", artworkUrl: "https://www.omnycontent.com/d/playlist/7e594858-42ba-4ecb-86d8-ad1a002e5281/1d39fbf3-b41a-4c54-88ec-adcd0136c774/df3205fa-ee92-4df4-9308-adcd0136c791/image.jpg?t=1729520499&size=Large" },
                 { name: "Brazalete Negro", rssUrl: "https://www.primaverasound.com/radio/shows/brazalete-negro?action=rss", artworkUrl: "https://assets-img.primaverasound.com/1400x1400/2022/ps-single/images/noticias/2022/psb/facebook/brazaletenegro_ed_2400x1256_20220516085356.jpg" },
@@ -111,32 +264,36 @@
                 { name: "Tiempo de Juego", rssUrl: "https://www.cope.es/api/es/programas/tiempo-de-juego/audios/rss.xml", artworkUrl: "https://imagenes.cope.es/uploads/2025/01/20/original_678e8defc69bc.jpeg" },
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
-            let episodeCache = new Map();
-
-            // --- ICONOS SVG ---
-            const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>`;
-            const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>`;
-            const rewindIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>`;
-            const forwardIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>`;
             
-            // --- FUNCIONES ---
+            let sessionCache = new Map();
+            let currentPodcast = null;
+            let currentEpisode = null;
+
+            // --- FUNCIONES PRINCIPALES ---
+
             async function fetchAndParseEpisodes(rssUrl) {
-                if (episodeCache.has(rssUrl)) return episodeCache.get(rssUrl);
+                if (sessionCache.has(rssUrl)) return sessionCache.get(rssUrl);
+
                 try {
                     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
                     const text = await response.text();
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(text, "application/xml");
-                    if (xmlDoc.querySelector("parsererror")) throw new Error("Failed to parse RSS feed.");
+
+                    if (xmlDoc.querySelector("parsererror")) { throw new Error("Failed to parse RSS feed."); }
+
                     const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => ({
                         title: item.querySelector("title")?.textContent || "Episodio sin título",
                         pubDate: new Date(item.querySelector("pubDate")?.textContent || ""),
                         description: (item.querySelector("description, content\\:encoded")?.textContent || "Sin descripción.").replace(/<[^>]*>/g, '').substring(0, 120) + '...',
                         audioUrl: item.querySelector("enclosure")?.getAttribute("url") || "",
                     })).filter(ep => ep.audioUrl).sort((a, b) => b.pubDate - a.pubDate);
-                    episodeCache.set(rssUrl, episodes);
+                        
+                    sessionCache.set(rssUrl, episodes);
                     return episodes;
+
                 } catch (error) {
                     console.error(`Error fetching RSS feed ${rssUrl}:`, error);
                     return null;
@@ -145,69 +302,114 @@
 
             function renderPodcastsView() {
                 showView('podcasts');
-                podcastsGrid.innerHTML = podcasts.map(podcast => `
-                    <div class="fade-in" data-rss-url="${podcast.rssUrl}">
-                        <img src="${podcast.artworkUrl}" alt="${podcast.name}" class="w-full h-auto rounded-lg shadow-lg aspect-square object-cover cursor-pointer transition-transform duration-300 hover:scale-105" onerror="this.onerror=null;this.src='https://placehold.co/300x300/1a202c/ff0000?text=Error';">
-                        <p class="text-center mt-2 font-semibold text-sm truncate">${podcast.name}</p>
-                    </div>
-                `).join('');
-                // Añadir listeners después de crear el HTML
-                podcastsGrid.querySelectorAll('[data-rss-url]').forEach(card => {
-                    card.addEventListener('click', () => {
-                        const clickedPodcast = podcasts.find(p => p.rssUrl === card.dataset.rssUrl);
-                        if(clickedPodcast) renderEpisodesView(clickedPodcast);
-                    });
+                podcastsGrid.innerHTML = '';
+
+                podcasts.forEach(podcast => {
+                    const card = document.createElement('div');
+                    card.className = 'fade-in card-hover';
+                    card.innerHTML = `
+                        <div class="relative">
+                            <img src="${podcast.artworkUrl}" alt="${podcast.name}" 
+                                class="w-full h-auto rounded-xl shadow-xl aspect-square object-cover cursor-pointer" 
+                                onerror="this.onerror=null;this.src='https://placehold.co/300x300/1e293b/f97316?text=Podcast';">
+                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 rounded-b-xl">
+                                <p class="text-center font-semibold text-white truncate">${podcast.name}</p>
+                            </div>
+                        </div>
+                    `;
+                    card.querySelector('img').addEventListener('click', () => renderEpisodesView(podcast));
+                    podcastsGrid.appendChild(card);
                 });
             }
 
             async function renderEpisodesView(podcast) {
+                currentPodcast = podcast;
                 showView('episodes');
                 episodesLoader.classList.remove('hidden');
                 episodesErrorEl.classList.add('hidden');
+                podcastHeader.innerHTML = '';
                 episodesList.innerHTML = '';
+
                 podcastHeader.innerHTML = `
-                    <img src="${podcast.artworkUrl}" alt="${podcast.name}" class="w-32 h-32 mx-auto rounded-lg shadow-xl mb-3">
+                    <img src="${podcast.artworkUrl}" alt="${podcast.name}" 
+                         class="w-40 h-40 mx-auto rounded-xl shadow-2xl mb-4 border-2 border-orange-500/50">
                     <h1 class="text-2xl font-bold">${podcast.name}</h1>
+                    <div class="mt-2 flex justify-center space-x-3">
+                        <button class="px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg font-medium">
+                            <i class="fas fa-play mr-2"></i> Reproducir todo
+                        </button>
+                        <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium">
+                            <i class="fas fa-star mr-2"></i> Favorito
+                        </button>
+                    </div>
                 `;
+                
                 const episodes = await fetchAndParseEpisodes(podcast.rssUrl);
-                episodesLoader.classList.add('hidden');
+
                 if (!episodes) {
+                    episodesLoader.classList.add('hidden');
                     episodesErrorEl.classList.remove('hidden');
+                    episodesErrorEl.querySelector('button').addEventListener('click', () => renderEpisodesView(podcast));
                     return;
                 }
+
+                episodesCountEl.textContent = episodes.length;
+
                 if (episodes.length > 0) {
-                    episodesList.innerHTML = episodes.map(episode => `
-                        <div class="p-3 mb-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors duration-200" data-episode-url="${episode.audioUrl}">
-                            <p class="font-bold">${episode.title}</p>
-                            <p class="text-xs text-gray-400 mt-1">${episode.pubDate.toLocaleDateString()}</p>
-                            <p class="text-sm text-gray-300 mt-2">${episode.description}</p>
-                        </div>
-                    `).join('');
-                    episodesList.querySelectorAll('[data-episode-url]').forEach(item => {
-                        item.addEventListener('click', () => {
-                            const clickedEpisode = episodes.find(e => e.audioUrl === item.dataset.episodeUrl);
-                            if(clickedEpisode) playEpisode(clickedEpisode, podcast);
-                        });
+                    episodes.forEach((episode, index) => {
+                        const episodeEl = document.createElement('div');
+                        episodeEl.className = 'episode-card p-4 bg-gray-800/50 rounded-xl cursor-pointer';
+                        episodeEl.innerHTML = `
+                            <div class="flex items-start">
+                                <div class="mr-4 text-orange-400 font-bold text-sm">${index + 1}</div>
+                                <div class="flex-grow">
+                                    <p class="font-bold text-white">${episode.title}</p>
+                                    <p class="text-xs text-gray-400 mt-1 flex items-center">
+                                        <i class="far fa-calendar mr-1"></i> ${episode.pubDate.toLocaleDateString()}
+                                    </p>
+                                    <p class="text-sm text-gray-300 mt-2">${episode.description}</p>
+                                </div>
+                                <div class="ml-2 text-gray-500 text-sm">
+                                    <i class="fas fa-play-circle text-lg"></i>
+                                </div>
+                            </div>
+                        `;
+                        episodeEl.addEventListener('click', () => playEpisode(episode, podcast));
+                        episodesList.appendChild(episodeEl);
                     });
                 } else {
-                     episodesList.innerHTML = `<p class="text-center text-gray-400">No se encontraron episodios.</p>`;
+                     episodesList.innerHTML = `<div class="text-center py-10 bg-gray-800/30 rounded-xl">
+                        <i class="fas fa-inbox text-3xl text-gray-500 mb-3"></i>
+                        <p class="text-gray-400">No se encontraron episodios en este podcast.</p>
+                     </div>`;
                 }
+                episodesLoader.classList.add('hidden');
             }
 
             function playEpisode(episode, podcast) {
+                currentEpisode = episode;
                 audioElement.src = episode.audioUrl;
                 audioElement.play();
-                const state = { episode, podcast, currentTime: 0 };
-                localStorage.setItem('playbackState', JSON.stringify(state));
+                
+                const state = { 
+                    currentTime: 0, 
+                    episode, 
+                    podcast,
+                    isPlaying: true
+                };
+                
                 updatePlayerUI(state);
-                updateMediaSession(state);
+                setupMediaSession(state);
             }
 
             function updatePlayerUI(state) {
                 player.classList.remove('hidden');
-                playerArtwork.src = state.podcast.artworkUrl;
                 playerEpisodeTitle.textContent = state.episode.title;
                 playerPodcastTitle.textContent = state.podcast.name;
+                playerArtwork.src = state.podcast.artworkUrl;
+                
+                // Actualizar botón de play/pause
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
 
             function showView(viewName) {
@@ -216,81 +418,187 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            function updateMediaSession(state) {
+            // SOLUCIÓN: Configuración completa de Media Session
+            function setupMediaSession(state) {
                 if ('mediaSession' in navigator) {
+                    // 1. Configurar metadatos con múltiples tamaños de artwork
                     navigator.mediaSession.metadata = new MediaMetadata({
-                        title: state.episode.title, artist: state.podcast.name, album: 'Podcasts',
-                        artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512' }]
+                        title: state.episode.title,
+                        artist: state.podcast.name,
+                        artwork: [
+                            { src: state.podcast.artworkUrl, sizes: '96x96' },
+                            { src: state.podcast.artworkUrl, sizes: '128x128' },
+                            { src: state.podcast.artworkUrl, sizes: '192x192' },
+                            { src: state.podcast.artworkUrl, sizes: '256x256' },
+                            { src: state.podcast.artworkUrl, sizes: '384x384' },
+                            { src: state.podcast.artworkUrl, sizes: '512x512' }
+                        ]
                     });
-                    const actions = [
-                        ['play', () => audioElement.play()],
-                        ['pause', () => audioElement.pause()],
-                        ['stop', () => {
-                            audioElement.pause();
-                            audioElement.currentTime = 0;
-                            player.classList.add('hidden');
-                            localStorage.removeItem('playbackState');
-                        }],
-                        ['seekbackward', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); }],
-                        ['seekforward', () => { audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30); }]
-                    ];
-                    for (const [action, handler] of actions) {
-                        try { navigator.mediaSession.setActionHandler(action, handler); } catch (error) {}
-                    }
+
+                    // 2. Definir acciones para controles de notificación
+                    navigator.mediaSession.setActionHandler('play', () => audioElement.play());
+                    navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
+                    navigator.mediaSession.setActionHandler('seekbackward', () => {
+                        audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
+                    });
+                    navigator.mediaSession.setActionHandler('seekforward', () => {
+                        audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30);
+                    });
+                    navigator.mediaSession.setActionHandler('previoustrack', () => {
+                        // Ir al episodio anterior (si existe)
+                        console.log("Previous track requested");
+                    });
+                    navigator.mediaSession.setActionHandler('nexttrack', () => {
+                        // Ir al siguiente episodio (si existe)
+                        console.log("Next track requested");
+                    });
+                    
+                    // 3. Actualizar estado inicial
+                    navigator.mediaSession.playbackState = "playing";
+                }
+            }
+
+            function updateMediaSessionState() {
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.playbackState = 
+                        audioElement.paused ? "paused" : "playing";
                 }
             }
             
             function restorePlaybackState() {
                 const savedStateJSON = localStorage.getItem('playbackState');
                 if (!savedStateJSON) return;
+
                 const savedState = JSON.parse(savedStateJSON);
-                if (!savedState.podcast || !savedState.episode || !savedState.currentTime) return;
+                if (!savedState.podcast || !savedState.episode) return;
+                
+                // Buscar el podcast en la lista
+                const podcast = podcasts.find(p => p.name === savedState.podcast.name);
+                if (!podcast) return;
+                
                 audioElement.src = savedState.episode.audioUrl;
-                audioElement.currentTime = savedState.currentTime;
+                audioElement.currentTime = savedState.currentTime || 0;
+
                 updatePlayerUI(savedState);
-                updateMediaSession(savedState);
-                audioElement.addEventListener('loadedmetadata', () => {
-                    playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
-                }, { once: true });
+                setupMediaSession(savedState);
+                
+                // Solo reproducir si estaba en marcha
+                if (savedState.isPlaying) {
+                    audioElement.play().catch(e => console.log("Auto-play bloqueado:", e));
+                }
+            }
+
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             }
 
             // --- EVENT LISTENERS ---
-            backToPodcastsBtn.addEventListener('click', renderPodcastsView);
-            playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
-            playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); });
-            playerForwardBtn.addEventListener('click', () => { audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30); });
-
-            audioElement.addEventListener('play', () => { playerPlayPauseBtn.innerHTML = pauseIcon; if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing"; });
-            audioElement.addEventListener('pause', () => { playerPlayPauseBtn.innerHTML = playIcon; if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused"; });
-            audioElement.addEventListener('ended', () => { player.classList.add('hidden'); localStorage.removeItem('playbackState'); });
+            backToPodcastsBtn.addEventListener('click', () => renderPodcastsView());
+            playerCloseBtn.addEventListener('click', () => {
+                player.classList.add('hidden');
+                audioElement.pause();
+            });
             
-            let lastSaveTime = 0;
-            audioElement.addEventListener('timeupdate', () => {
-                if (!audioElement.duration) return;
-                playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
-                const now = Date.now();
-                if (now - lastSaveTime > 3000) { // Guardar cada 3 segundos
-                    const savedStateJSON = localStorage.getItem('playbackState');
-                    if (savedStateJSON) {
-                        const currentState = JSON.parse(savedStateJSON);
-                        currentState.currentTime = audioElement.currentTime;
-                        localStorage.setItem('playbackState', JSON.stringify(currentState));
-                    }
-                    lastSaveTime = now;
+            playerPlayPauseBtn.addEventListener('click', () => {
+                if (audioElement.paused) {
+                    audioElement.play();
+                } else {
+                    audioElement.pause();
                 }
+            });
+            
+            playerRewindBtn.addEventListener('click', () => {
+                audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
+            });
+            
+            playerForwardBtn.addEventListener('click', () => {
+                audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30);
+            });
+
+            // Barra de progreso clicable
+            progressBar.parentElement.addEventListener('click', (e) => {
+                const rect = progressBar.parentElement.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                audioElement.currentTime = percent * audioElement.duration;
+            });
+
+            audioElement.addEventListener('play', () => {
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                updateMediaSessionState();
+            });
+            
+            audioElement.addEventListener('pause', () => {
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                updateMediaSessionState();
+            });
+
+            audioElement.addEventListener('timeupdate', () => {
+                if (audioElement.duration) {
+                    const percent = (audioElement.currentTime / audioElement.duration) * 100;
+                    progressBar.style.width = `${percent}%`;
+                    
+                    currentTimeEl.textContent = formatTime(audioElement.currentTime);
+                    durationEl.textContent = formatTime(audioElement.duration);
+                    
+                    // Guardar estado cada 5 segundos
+                    if (currentPodcast && currentEpisode) {
+                        const state = {
+                            currentTime: audioElement.currentTime,
+                            episode: currentEpisode,
+                            podcast: currentPodcast,
+                            isPlaying: !audioElement.paused
+                        };
+                        localStorage.setItem('playbackState', JSON.stringify(state));
+                    }
+                }
+            });
+            
+            audioElement.addEventListener('loadedmetadata', () => {
+                if (audioElement.duration) {
+                    durationEl.textContent = formatTime(audioElement.duration);
+                }
+            });
+            
+            audioElement.addEventListener('ended', () => {
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                localStorage.removeItem('playbackState');
             });
 
             // --- INICIALIZACIÓN ---
             function init() {
-                playerPlayPauseBtn.innerHTML = playIcon;
-                playerRewindBtn.innerHTML = rewindIcon;
-                playerForwardBtn.innerHTML = forwardIcon;
                 renderPodcastsView();
                 restorePlaybackState();
+                
+                // Mostrar mensaje de bienvenida
+                setTimeout(() => {
+                    const welcomeMsg = document.createElement('div');
+                    welcomeMsg.className = 'fixed bottom-20 left-4 right-4 bg-orange-500 text-white p-4 rounded-xl shadow-lg z-30 fade-in';
+                    welcomeMsg.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-headphones-alt text-xl mr-3"></i>
+                            <div>
+                                <p class="font-bold">¡Bienvenido a Podcast App!</p>
+                                <p class="text-sm">Selecciona un podcast para comenzar a escuchar</p>
+                            </div>
+                            <button class="ml-auto text-white" onclick="this.parentElement.parentElement.remove()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    `;
+                    document.body.appendChild(welcomeMsg);
+                    
+                    // Auto-ocultar después de 5 segundos
+                    setTimeout(() => {
+                        welcomeMsg.classList.add('opacity-0');
+                        setTimeout(() => welcomeMsg.remove(), 500);
+                    }, 5000);
+                }, 1000);
             }
+
             init();
         });
     </script>
 </body>
 </html>
-
