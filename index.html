@@ -291,9 +291,6 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            /**
-             * Actualiza el estado de la posición para el widget de Android.
-             */
             function updatePositionState() {
                 if ('mediaSession' in navigator && audioElement.duration) {
                     navigator.mediaSession.setPositionState({
@@ -318,9 +315,13 @@
                     navigator.mediaSession.setActionHandler('seekbackward', (details) => { audioElement.currentTime = Math.max(0, audioElement.currentTime - (details.seekOffset || 15)); });
                     navigator.mediaSession.setActionHandler('seekforward', (details) => { audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + (details.seekOffset || 30)); });
                     navigator.mediaSession.setActionHandler('seekto', (details) => { audioElement.currentTime = details.seekTime; });
-
-                    navigator.mediaSession.setActionHandler('previoustrack', null);
-                    navigator.mediaSession.setActionHandler('nexttrack', null);
+                    
+                    // --- INICIO DE LA MODIFICACIÓN ---
+                    // Se definen las acciones de pista anterior/siguiente como funciones vacías
+                    // para forzar a más versiones de Android a mostrar el set completo de controles.
+                    navigator.mediaSession.setActionHandler('previoustrack', () => {});
+                    navigator.mediaSession.setActionHandler('nexttrack', () => {});
+                    // --- FIN DE LA MODIFICACIÓN ---
 
                     navigator.mediaSession.setActionHandler('stop', () => {
                         audioElement.pause();
@@ -389,11 +390,19 @@
                 if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
             });
 
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Se añade un listener para 'loadedmetadata' para asegurar que el estado de la posición
+            // se actualiza en cuanto la duración del audio es conocida.
+            audioElement.addEventListener('loadedmetadata', () => {
+                updatePositionState();
+            });
+            // --- FIN DE LA MODIFICACIÓN ---
+
             let lastSaveTime = 0;
             audioElement.addEventListener('timeupdate', () => {
                 if (audioElement.duration) {
                     playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
-                    updatePositionState(); // <-- SOLUCIÓN PARA LA BARRA DE PROGRESO DEL WIDGET
+                    updatePositionState();
                     const now = Date.now();
                     if (now - lastSaveTime > 3000) {
                         const state = {
