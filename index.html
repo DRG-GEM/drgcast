@@ -46,7 +46,7 @@
             <div id="podcasts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 <!-- Las carátulas de los podcasts se insertarán aquí -->
             </div>
-            <div id="podcasts-loader" class="text-center py-10">
+            <div id="podcasts-loader" class="hidden text-center py-10"> <!-- Oculto por defecto -->
                 <p>Cargando podcasts...</p>
             </div>
             <div id="podcasts-error" class="hidden text-center py-10 bg-red-900/50 rounded-lg">
@@ -102,14 +102,10 @@
             const episodesList = document.getElementById('episodes-list');
             const podcastHeader = document.getElementById('podcast-header');
             const backToPodcastsBtn = document.getElementById('back-to-podcasts');
-
-            // Loaders y Errores
             const podcastsLoader = document.getElementById('podcasts-loader');
             const episodesLoader = document.getElementById('episodes-loader');
             const podcastsErrorEl = document.getElementById('podcasts-error');
             const episodesErrorEl = document.getElementById('episodes-error');
-
-            // Reproductor
             const player = document.getElementById('player');
             const audioElement = document.getElementById('audio-element');
             const playerArtwork = document.getElementById('player-artwork');
@@ -119,9 +115,7 @@
             const playerProgress = document.getElementById('player-progress');
 
             // --- DATOS Y ESTADO ---
-            // Usamos un proxy para evitar problemas de CORS al hacer fetch de los feeds RSS
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-
             const podcasts = [
                 { name: "A dos bandas", rssUrl: "https://www.omnycontent.com/d/playlist/7e594858-42ba-4ecb-86d8-ad1a002e5281/1d39fbf3-b41a-4c54-88ec-adcd0136c774/df3205fa-ee92-4df4-9308-adcd0136c791/podcast.rss" },
                 { name: "Brazalete Negro", rssUrl: "https://www.primaverasound.com/radio/shows/brazalete-negro?action=rss" },
@@ -136,8 +130,9 @@
                 { name: "Tiempo de Juego", rssUrl: "https://www.cope.es/api/es/programas/tiempo-de-juego/audios/rss.xml" },
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml" }
             ];
-
-            let podcastCache = new Map(); // Caché para guardar los datos de los feeds
+            
+            // Caché en memoria para la sesión actual. Evita peticiones repetidas si se navega atrás y adelante.
+            let sessionCache = new Map();
 
             // --- ICONOS SVG ---
             const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
@@ -146,13 +141,20 @@
             // --- FUNCIONES PRINCIPALES ---
 
             /**
-             * Obtiene y parsea un feed RSS.
+             * Obtiene y parsea un feed RSS. Puede obtener solo metadatos o el feed completo.
              * @param {string} rssUrl - La URL del feed RSS.
+             * @param {boolean} [metadataOnly=false] - Si es true, solo obtiene título y carátula.
              * @returns {Promise<object|null>} - Un objeto con los datos del podcast o null si hay error.
              */
-            async function fetchAndParseRSS(rssUrl) {
-                if (podcastCache.has(rssUrl)) {
-                    return podcastCache.get(rssUrl);
+            async function fetchAndParseRSS(rssUrl, metadataOnly = false) {
+                const cached = sessionCache.get(rssUrl);
+                // Si pedimos solo metadatos y ya están, los devolvemos.
+                if (metadataOnly && cached && cached.artworkUrl) {
+                    return cached;
+                }
+                // Si pedimos el feed completo y ya está, lo devolvemos.
+                if (!metadataOnly && cached && cached.episodes) {
+                    return cached;
                 }
 
                 try {
@@ -163,75 +165,99 @@
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(text, "application/xml");
 
-                    // Manejo de errores de parseo
                     const parseError = xmlDoc.querySelector("parsererror");
-                    if (parseError) {
-                        console.error("Error parsing XML:", parseError);
-                        throw new Error("Failed to parse RSS feed.");
-                    }
+                    if (parseError) { throw new Error("Failed to parse RSS feed."); }
 
                     const title = xmlDoc.querySelector("channel > title")?.textContent || "Sin título";
                     const artworkUrl = xmlDoc.querySelector("channel > image > url")?.textContent || xmlDoc.querySelector("channel > itunes\\:image, channel > image")?.getAttribute("href") || "https://placehold.co/300x300/1a202c/ffffff?text=Podcast";
                     
-                    const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => {
-                        const episodeTitle = item.querySelector("title")?.textContent || "Episodio sin título";
-                        const pubDate = item.querySelector("pubDate")?.textContent || "";
-                        const description = item.querySelector("description, content\\:encoded")?.textContent || "Sin descripción.";
-                        const audioUrl = item.querySelector("enclosure")?.getAttribute("url") || "";
-                        
-                        return {
-                            title: episodeTitle,
-                            pubDate: new Date(pubDate),
-                            description: description.replace(/<[^>]*>/g, '').substring(0, 120) + '...', // Limpiar HTML y truncar
-                            audioUrl: audioUrl,
-                        };
-                    }).filter(ep => ep.audioUrl) // Solo episodios con URL de audio
-                      .sort((a, b) => b.pubDate - a.pubDate); // Ordenar del más nuevo al más viejo
+                    const existingCache = sessionCache.get(rssUrl) || {};
+                    let resultData = { ...existingCache, title, artworkUrl };
 
-                    const podcastData = { title, artworkUrl, episodes };
-                    podcastCache.set(rssUrl, podcastData);
-                    return podcastData;
+                    if (!metadataOnly) {
+                        const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => ({
+                            title: item.querySelector("title")?.textContent || "Episodio sin título",
+                            pubDate: new Date(item.querySelector("pubDate")?.textContent || ""),
+                            description: (item.querySelector("description, content\\:encoded")?.textContent || "Sin descripción.").replace(/<[^>]*>/g, '').substring(0, 120) + '...',
+                            audioUrl: item.querySelector("enclosure")?.getAttribute("url") || "",
+                        })).filter(ep => ep.audioUrl).sort((a, b) => b.pubDate - a.pubDate);
+                        resultData.episodes = episodes;
+                    }
+                    
+                    sessionCache.set(rssUrl, resultData);
+                    return resultData;
 
                 } catch (error) {
-                    console.error(`Error fetching or parsing RSS feed ${rssUrl}:`, error);
+                    console.error(`Error fetching RSS feed ${rssUrl}:`, error);
                     return null;
                 }
             }
 
             /**
-             * Renderiza la vista principal con la cuadrícula de podcasts.
+             * Renderiza la vista principal, usando caché para una carga rápida.
              */
-            async function renderPodcastsView() {
+            function renderPodcastsView() {
                 showView('podcasts');
-                podcastsLoader.classList.remove('hidden');
-                podcastsErrorEl.classList.add('hidden');
                 podcastsGrid.innerHTML = '';
+                podcastsErrorEl.classList.add('hidden');
+                podcastsLoader.classList.add('hidden');
 
-                const podcastPromises = podcasts.map(async (podcast) => {
-                    const data = await fetchAndParseRSS(podcast.rssUrl);
-                    if (data) {
-                        const card = document.createElement('div');
-                        card.className = 'fade-in';
-                        card.innerHTML = `
-                            <img src="${data.artworkUrl}" alt="${data.title}" class="w-full h-auto rounded-lg shadow-lg aspect-square object-cover cursor-pointer transition-transform duration-300 hover:scale-105">
-                            <p class="text-center mt-2 font-semibold text-sm truncate">${data.title}</p>
-                        `;
-                        card.querySelector('img').addEventListener('click', () => renderEpisodesView(podcast.rssUrl));
-                        podcastsGrid.appendChild(card);
+                let metadataCache = {};
+                try {
+                    metadataCache = JSON.parse(localStorage.getItem('podcastMetadataCache')) || {};
+                } catch (e) {
+                    console.error("Error al parsear la caché de metadatos", e);
+                    metadataCache = {};
+                }
+
+                // 1. Renderizar inmediatamente desde la lista (usando caché de localStorage si existe)
+                podcasts.forEach(podcast => {
+                    const cachedInfo = metadataCache[podcast.rssUrl];
+                    const card = document.createElement('div');
+                    card.className = 'fade-in';
+                    card.dataset.rssUrl = podcast.rssUrl;
+
+                    const artwork = cachedInfo ? cachedInfo.artworkUrl : 'https://placehold.co/300x300/1a202c/ffffff?text=...';
+                    const title = cachedInfo ? cachedInfo.title : podcast.name;
+
+                    card.innerHTML = `
+                        <img src="${artwork}" alt="${title}" class="w-full h-auto rounded-lg shadow-lg aspect-square object-cover cursor-pointer transition-transform duration-300 hover:scale-105" onerror="this.src='https://placehold.co/300x300/1a202c/ff0000?text=Error';">
+                        <p class="text-center mt-2 font-semibold text-sm truncate">${title}</p>
+                    `;
+                    
+                    card.querySelector('img').addEventListener('click', () => renderEpisodesView(podcast.rssUrl));
+                    podcastsGrid.appendChild(card);
+                });
+
+                // 2. Actualizar los datos en segundo plano
+                const updatePromises = podcasts.map(async (podcast) => {
+                    const freshMetadata = await fetchAndParseRSS(podcast.rssUrl, true); // true para solo metadatos
+                    if (freshMetadata) {
+                        metadataCache[podcast.rssUrl] = { title: freshMetadata.title, artworkUrl: freshMetadata.artworkUrl };
+
+                        const cardToUpdate = podcastsGrid.querySelector(`[data-rss-url="${podcast.rssUrl}"]`);
+                        if (cardToUpdate) {
+                            const img = cardToUpdate.querySelector('img');
+                            const p = cardToUpdate.querySelector('p');
+                            if (img.src !== freshMetadata.artworkUrl) img.src = freshMetadata.artworkUrl;
+                            if (img.alt !== freshMetadata.title) img.alt = freshMetadata.title;
+                            if (p.textContent !== freshMetadata.title) p.textContent = freshMetadata.title;
+                        }
                     }
                 });
 
-                await Promise.all(podcastPromises);
-                podcastsLoader.classList.add('hidden');
-
-                if (podcastsGrid.children.length === 0) {
-                    podcastsErrorEl.classList.remove('hidden');
-                }
+                // 3. Guardar la caché actualizada en localStorage cuando todo termine
+                Promise.allSettled(updatePromises).then(() => {
+                    try {
+                        localStorage.setItem('podcastMetadataCache', JSON.stringify(metadataCache));
+                    } catch (e) {
+                        console.error("Error al guardar la caché en localStorage", e);
+                    }
+                });
             }
 
             /**
              * Renderiza la vista de episodios para un podcast específico.
-             * @param {string} rssUrl - La URL del feed del podcast a mostrar.
              */
             async function renderEpisodesView(rssUrl) {
                 showView('episodes');
@@ -240,7 +266,7 @@
                 podcastHeader.innerHTML = '';
                 episodesList.innerHTML = '';
 
-                const data = await fetchAndParseRSS(rssUrl);
+                const data = await fetchAndParseRSS(rssUrl, false); // false para obtener el feed completo
 
                 if (!data) {
                     episodesLoader.classList.add('hidden');
@@ -253,43 +279,36 @@
                     <h1 class="text-2xl font-bold">${data.title}</h1>
                 `;
 
-                data.episodes.forEach(episode => {
-                    const episodeEl = document.createElement('div');
-                    episodeEl.className = 'p-3 mb-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors duration-200';
-                    episodeEl.innerHTML = `
-                        <p class="font-bold">${episode.title}</p>
-                        <p class="text-xs text-gray-400 mt-1">${episode.pubDate.toLocaleDateString()}</p>
-                        <p class="text-sm text-gray-300 mt-2">${episode.description}</p>
-                    `;
-                    episodeEl.addEventListener('click', () => playEpisode(episode, data));
-                    episodesList.appendChild(episodeEl);
-                });
+                if (data.episodes && data.episodes.length > 0) {
+                    data.episodes.forEach(episode => {
+                        const episodeEl = document.createElement('div');
+                        episodeEl.className = 'p-3 mb-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors duration-200';
+                        episodeEl.innerHTML = `
+                            <p class="font-bold">${episode.title}</p>
+                            <p class="text-xs text-gray-400 mt-1">${episode.pubDate.toLocaleDateString()}</p>
+                            <p class="text-sm text-gray-300 mt-2">${episode.description}</p>
+                        `;
+                        episodeEl.addEventListener('click', () => playEpisode(episode, data));
+                        episodesList.appendChild(episodeEl);
+                    });
+                } else {
+                     episodesList.innerHTML = `<p class="text-center text-gray-400">No se encontraron episodios.</p>`;
+                }
 
                 episodesLoader.classList.add('hidden');
             }
 
-            /**
-             * Inicia la reproducción de un episodio.
-             * @param {object} episode - El objeto del episodio.
-             * @param {object} podcastData - Los datos del podcast al que pertenece.
-             */
             function playEpisode(episode, podcastData) {
                 audioElement.src = episode.audioUrl;
                 audioElement.play();
-
                 player.classList.remove('hidden');
                 playerEpisodeTitle.textContent = episode.title;
                 playerPodcastTitle.textContent = podcastData.title;
                 playerArtwork.src = podcastData.artworkUrl;
                 playerPlayPauseBtn.innerHTML = pauseIcon;
-                
                 updateMediaSession(episode, podcastData);
             }
 
-            /**
-             * Cambia entre la vista de podcasts y la de episodios.
-             * @param {'podcasts' | 'episodes'} viewName - El nombre de la vista a mostrar.
-             */
             function showView(viewName) {
                 podcastsView.classList.toggle('hidden', viewName !== 'podcasts');
                 episodesView.classList.toggle('hidden', viewName !== 'episodes');
@@ -298,9 +317,6 @@
                 }
             }
 
-            /**
-             * Actualiza la Media Session API con la información del episodio actual.
-             */
             function updateMediaSession(episode, podcastData) {
                 if ('mediaSession' in navigator) {
                     navigator.mediaSession.metadata = new MediaMetadata({
@@ -309,8 +325,6 @@
                         album: 'Podcasts',
                         artwork: [{ src: podcastData.artworkUrl, sizes: '512x512', type: 'image/png' }]
                     });
-
-                    // Asignar manejadores de acciones
                     navigator.mediaSession.setActionHandler('play', () => audioElement.play());
                     navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
                     navigator.mediaSession.setActionHandler('stop', () => {
@@ -324,38 +338,25 @@
             }
 
             // --- EVENT LISTENERS ---
-
             backToPodcastsBtn.addEventListener('click', () => renderPodcastsView());
-
             playerPlayPauseBtn.addEventListener('click', () => {
-                if (audioElement.paused) {
-                    audioElement.play();
-                } else {
-                    audioElement.pause();
-                }
+                if (audioElement.paused) audioElement.play();
+                else audioElement.pause();
             });
-
             audioElement.addEventListener('play', () => {
                 playerPlayPauseBtn.innerHTML = pauseIcon;
-                navigator.mediaSession.playbackState = "playing";
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
             });
-
             audioElement.addEventListener('pause', () => {
                 playerPlayPauseBtn.innerHTML = playIcon;
-                navigator.mediaSession.playbackState = "paused";
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
             });
-
             audioElement.addEventListener('timeupdate', () => {
                 if (audioElement.duration) {
-                    const progress = (audioElement.currentTime / audioElement.duration) * 100;
-                    playerProgress.value = progress;
+                    playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
                 }
             });
-            
-            audioElement.addEventListener('ended', () => {
-                // Opcional: reproducir el siguiente episodio
-                player.classList.add('hidden');
-            });
+            audioElement.addEventListener('ended', () => player.classList.add('hidden'));
 
             // --- INICIALIZACIÓN ---
             renderPodcastsView();
