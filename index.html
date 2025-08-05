@@ -291,6 +291,19 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
+            /**
+             * Actualiza el estado de la posición para el widget de Android.
+             */
+            function updatePositionState() {
+                if ('mediaSession' in navigator && audioElement.duration) {
+                    navigator.mediaSession.setPositionState({
+                        duration: audioElement.duration,
+                        playbackRate: audioElement.playbackRate,
+                        position: audioElement.currentTime,
+                    });
+                }
+            }
+
             function updateMediaSession(episode, podcastData) {
                 if ('mediaSession' in navigator) {
                     navigator.mediaSession.metadata = new MediaMetadata({
@@ -300,30 +313,21 @@
                         artwork: [{ src: podcastData.artworkUrl, sizes: '512x512', type: 'image/png' }]
                     });
                     
-                    // --- INICIO DE LA MODIFICACIÓN ---
-                    // Se definen todas las acciones para asegurar que el widget de Android muestre todos los controles.
-                    
-                    // Acción de Play/Pausa
                     navigator.mediaSession.setActionHandler('play', () => audioElement.play());
                     navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
-                    
-                    // Acciones de Avance y Retroceso
-                    navigator.mediaSession.setActionHandler('seekbackward', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); });
-                    navigator.mediaSession.setActionHandler('seekforward', () => { audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30); });
+                    navigator.mediaSession.setActionHandler('seekbackward', (details) => { audioElement.currentTime = Math.max(0, audioElement.currentTime - (details.seekOffset || 15)); });
+                    navigator.mediaSession.setActionHandler('seekforward', (details) => { audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + (details.seekOffset || 30)); });
+                    navigator.mediaSession.setActionHandler('seekto', (details) => { audioElement.currentTime = details.seekTime; });
 
-                    // Acciones de Pista Anterior/Siguiente. Se ponen a null para indicar que no están disponibles,
-                    // pero su mera presencia ayuda a que se muestren los otros controles en algunas versiones de Android.
                     navigator.mediaSession.setActionHandler('previoustrack', null);
                     navigator.mediaSession.setActionHandler('nexttrack', null);
 
-                    // Acción de Detener
                     navigator.mediaSession.setActionHandler('stop', () => {
                         audioElement.pause();
                         audioElement.currentTime = 0;
                         player.classList.add('hidden');
                         localStorage.removeItem('playbackState');
                     });
-                     // --- FIN DE LA MODIFICACIÓN ---
                 }
             }
             
@@ -345,7 +349,14 @@
 
                 audioElement.src = episodeToRestore.audioUrl;
                 audioElement.dataset.rssUrl = savedState.rssUrl;
-                audioElement.currentTime = savedState.currentTime;
+                
+                audioElement.addEventListener('loadedmetadata', () => {
+                    audioElement.currentTime = savedState.currentTime;
+                    updatePositionState();
+                    if (audioElement.duration) {
+                        playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
+                    }
+                }, { once: true });
 
                 player.classList.remove('hidden');
                 playerEpisodeTitle.textContent = episodeToRestore.title;
@@ -353,12 +364,6 @@
                 playerArtwork.src = podcastData.artworkUrl;
                 playerPlayPauseBtn.innerHTML = playIcon;
                 
-                audioElement.addEventListener('loadedmetadata', () => {
-                    if (audioElement.duration) {
-                        playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
-                    }
-                }, { once: true });
-
                 updateMediaSession(episodeToRestore, podcastData);
             }
 
@@ -388,6 +393,7 @@
             audioElement.addEventListener('timeupdate', () => {
                 if (audioElement.duration) {
                     playerProgress.value = (audioElement.currentTime / audioElement.duration) * 100;
+                    updatePositionState(); // <-- SOLUCIÓN PARA LA BARRA DE PROGRESO DEL WIDGET
                     const now = Date.now();
                     if (now - lastSaveTime > 3000) {
                         const state = {
