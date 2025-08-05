@@ -241,7 +241,6 @@
             const playerPlayPauseBtn = document.getElementById('player-play-pause');
             const playerRewindBtn = document.getElementById('player-rewind');
             const playerForwardBtn = document.getElementById('player-forward');
-            const playerProgress = document.getElementById('player-progress');
             const progressBar = document.getElementById('progress-bar');
             const currentTimeEl = document.getElementById('current-time');
             const durationEl = document.getElementById('duration');
@@ -389,7 +388,7 @@
             function playEpisode(episode, podcast) {
                 currentEpisode = episode;
                 audioElement.src = episode.audioUrl;
-                audioElement.play();
+                audioElement.play().catch(e => console.error("Error al reproducir:", e));
                 
                 const state = { 
                     currentTime: 0, 
@@ -418,10 +417,10 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            // SOLUCIÓN: Configuración completa de Media Session
+            // SOLUCIÓN: Configuración completa de Media Session CON CORRECCIÓN DE TIEMPO
             function setupMediaSession(state) {
                 if ('mediaSession' in navigator) {
-                    // 1. Configurar metadatos con múltiples tamaños de artwork
+                    // 1. Configurar metadatos
                     navigator.mediaSession.metadata = new MediaMetadata({
                         title: state.episode.title,
                         artist: state.podcast.name,
@@ -435,26 +434,34 @@
                         ]
                     });
 
-                    // 2. Definir acciones para controles de notificación
+                    // 2. Definir acciones
                     navigator.mediaSession.setActionHandler('play', () => audioElement.play());
                     navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
                     navigator.mediaSession.setActionHandler('seekbackward', () => {
                         audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
+                        updatePositionState(); // Actualizar estado después de cambiar
                     });
                     navigator.mediaSession.setActionHandler('seekforward', () => {
                         audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30);
-                    });
-                    navigator.mediaSession.setActionHandler('previoustrack', () => {
-                        // Ir al episodio anterior (si existe)
-                        console.log("Previous track requested");
-                    });
-                    navigator.mediaSession.setActionHandler('nexttrack', () => {
-                        // Ir al siguiente episodio (si existe)
-                        console.log("Next track requested");
+                        updatePositionState(); // Actualizar estado después de cambiar
                     });
                     
-                    // 3. Actualizar estado inicial
+                    // 3. Configurar estado de posición INICIAL
+                    updatePositionState();
+                    
+                    // 4. Actualizar estado de reproducción
                     navigator.mediaSession.playbackState = "playing";
+                }
+            }
+
+            // NUEVA FUNCIÓN: Actualizar posición de reproducción en Media Session
+            function updatePositionState() {
+                if ('mediaSession' in navigator && audioElement.duration) {
+                    navigator.mediaSession.setPositionState({
+                        duration: audioElement.duration,
+                        position: audioElement.currentTime,
+                        playbackRate: 1
+                    });
                 }
             }
 
@@ -511,10 +518,12 @@
             
             playerRewindBtn.addEventListener('click', () => {
                 audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
+                updatePositionState(); // Actualizar estado después de rebobinar
             });
             
             playerForwardBtn.addEventListener('click', () => {
                 audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30);
+                updatePositionState(); // Actualizar estado después de adelantar
             });
 
             // Barra de progreso clicable
@@ -522,6 +531,7 @@
                 const rect = progressBar.parentElement.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
                 audioElement.currentTime = percent * audioElement.duration;
+                updatePositionState(); // Actualizar estado después de cambiar posición
             });
 
             audioElement.addEventListener('play', () => {
@@ -542,6 +552,9 @@
                     currentTimeEl.textContent = formatTime(audioElement.currentTime);
                     durationEl.textContent = formatTime(audioElement.duration);
                     
+                    // Actualizar Media Session con la posición actual
+                    updatePositionState();
+                    
                     // Guardar estado cada 5 segundos
                     if (currentPodcast && currentEpisode) {
                         const state = {
@@ -558,6 +571,9 @@
             audioElement.addEventListener('loadedmetadata', () => {
                 if (audioElement.duration) {
                     durationEl.textContent = formatTime(audioElement.duration);
+                    
+                    // Actualizar Media Session con la duración y posición
+                    updatePositionState();
                 }
             });
             
