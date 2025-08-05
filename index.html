@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es" class="bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos personalizados y animaciones */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Estilo para la barra de progreso */
+        progress[value]::-webkit-progress-bar {
+            background-color: #4a5568;
+            border-radius: 9999px;
+        }
+        progress[value]::-webkit-progress-value {
+            background-color: #f6ad55;
+            border-radius: 9999px;
+            transition: width 0.1s linear;
+        }
+        .player-shadow {
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- Contenedor principal de la aplicación -->
+    <div id="app-container" class="pb-32"> <!-- Padding bottom para dejar espacio al reproductor -->
+
+        <!-- Vista: Mis Podcasts -->
+        <div id="podcasts-view" class="p-4">
+            <h1 class="text-3xl font-bold mb-6 text-orange-400">Mis Podcasts</h1>
+            <div id="podcasts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <!-- Las carátulas de los podcasts se insertarán aquí -->
+            </div>
+            <div id="podcasts-loader" class="text-center py-10">
+                <p>Cargando podcasts...</p>
+            </div>
+            <div id="podcasts-error" class="hidden text-center py-10 bg-red-900/50 rounded-lg">
+                <p>Error al cargar los podcasts. Revisa tu conexión.</p>
+            </div>
+        </div>
+
+        <!-- Vista: Episodios de un Podcast -->
+        <div id="episodes-view" class="hidden p-4 fade-in">
+            <button id="back-to-podcasts" class="mb-4 text-orange-400 font-semibold">&larr; Volver</button>
+            <div id="podcast-header" class="text-center mb-6">
+                <!-- La información del podcast seleccionado se insertará aquí -->
+            </div>
+            <h2 class="text-2xl font-bold mb-4">Episodios</h2>
+            <div id="episodes-list">
+                <!-- La lista de episodios se insertará aquí -->
+            </div>
+            <div id="episodes-loader" class="text-center py-10">
+                <p>Cargando episodios...</p>
+            </div>
+             <div id="episodes-error" class="hidden text-center py-10 bg-red-900/50 rounded-lg">
+                <p>No se pudo cargar el feed RSS de este podcast.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reproductor de Audio Fijo -->
+    <div id="player" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-3 player-shadow fade-in">
+        <div class="flex items-center">
+            <img id="player-artwork" src="https://placehold.co/60x60/1a202c/ffffff?text=?" class="w-14 h-14 rounded-md mr-3" alt="Carátula del episodio">
+            <div class="flex-grow overflow-hidden">
+                <p id="player-episode-title" class="font-bold text-sm truncate">Título del episodio</p>
+                <p id="player-podcast-title" class="text-xs text-gray-400">Nombre del Podcast</p>
+            </div>
+            <button id="player-play-pause" class="p-2 ml-3">
+                <!-- Icono de Play/Pausa se insertará aquí -->
+            </button>
+        </div>
+        <div class="mt-2">
+            <progress id="player-progress" value="0" max="100" class="w-full h-1.5"></progress>
+        </div>
+    </div>
+
+    <!-- Elemento de audio (oculto) -->
+    <audio id="audio-element"></audio>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ELEMENTOS DEL DOM ---
+            const podcastsView = document.getElementById('podcasts-view');
+            const episodesView = document.getElementById('episodes-view');
+            const podcastsGrid = document.getElementById('podcasts-grid');
+            const episodesList = document.getElementById('episodes-list');
+            const podcastHeader = document.getElementById('podcast-header');
+            const backToPodcastsBtn = document.getElementById('back-to-podcasts');
+
+            // Loaders y Errores
+            const podcastsLoader = document.getElementById('podcasts-loader');
+            const episodesLoader = document.getElementById('episodes-loader');
+            const podcastsErrorEl = document.getElementById('podcasts-error');
+            const episodesErrorEl = document.getElementById('episodes-error');
+
+            // Reproductor
+            const player = document.getElementById('player');
+            const audioElement = document.getElementById('audio-element');
+            const playerArtwork = document.getElementById('player-artwork');
+            const playerEpisodeTitle = document.getElementById('player-episode-title');
+            const playerPodcastTitle = document.getElementById('player-podcast-title');
+            const playerPlayPauseBtn = document.getElementById('player-play-pause');
+            const playerProgress = document.getElementById('player-progress');
+
+            // --- DATOS Y ESTADO ---
+            // Usamos un proxy para evitar problemas de CORS al hacer fetch de los feeds RSS
+            const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+
+            const podcasts = [
+                { name: "A dos bandas", rssUrl: "https://www.omnycontent.com/d/playlist/7e594858-42ba-4ecb-86d8-ad1a002e5281/1d39fbf3-b41a-4c54-88ec-adcd0136c774/df3205fa-ee92-4df4-9308-adcd0136c791/podcast.rss" },
+                { name: "Brazalete Negro", rssUrl: "https://www.primaverasound.com/radio/shows/brazalete-negro?action=rss" },
+                { name: "El Larguero", rssUrl: "https://fapi-top.prisasd.com/podcast/playser/el_larguero/itunestfp/podcast.xml" },
+                { name: "El Morning de Axel y Rulo", rssUrl: "https://www.ivoox.com/feed_fg_f1305937_filtro_1.xml" },
+                { name: "El Partidazo de COPE", rssUrl: "https://www.cope.es/api/es/programas/el-partidazo-de-cope/audios/rss.xml" },
+                { name: "La Libreta de Van Gaal", rssUrl: "https://feeds.megaphone.fm/LALIBRETA2492905101" },
+                { name: "La Pizarra de Quintana", rssUrl: "https://www.omnycontent.com/d/playlist/4ac2c3a8-bb0c-499b-bf22-ac8400df1983/23858072-d78f-4b2c-870e-ad95016caf18/272fdbf7-9428-4781-92e9-ad95016eb929/podcast.rss" },
+                { name: "La Tribu con Raúl Varela", rssUrl: "https://www.omnycontent.com/d/playlist/4ac2c3a8-bb0c-499b-bf22-ac8400df1983/7345e2c8-3edf-4530-b882-ac8700b152e1/a6c99e71-a9ce-48d3-97d9-acaa0101581c/podcast.rss" },
+                { name: "Offsiders", rssUrl: "https://feeds.megaphone.fm/HOT2717170364" },
+                { name: "Tertulia Blanquinegra - Efesista APP", rssUrl: "https://www.ivoox.com/feed_fg_f1156320_filtro_1.xml" },
+                { name: "Tiempo de Juego", rssUrl: "https://www.cope.es/api/es/programas/tiempo-de-juego/audios/rss.xml" },
+                { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml" }
+            ];
+
+            let podcastCache = new Map(); // Caché para guardar los datos de los feeds
+
+            // --- ICONOS SVG ---
+            const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+
+            // --- FUNCIONES PRINCIPALES ---
+
+            /**
+             * Obtiene y parsea un feed RSS.
+             * @param {string} rssUrl - La URL del feed RSS.
+             * @returns {Promise<object|null>} - Un objeto con los datos del podcast o null si hay error.
+             */
+            async function fetchAndParseRSS(rssUrl) {
+                if (podcastCache.has(rssUrl)) {
+                    return podcastCache.get(rssUrl);
+                }
+
+                try {
+                    const response = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const text = await response.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(text, "application/xml");
+
+                    // Manejo de errores de parseo
+                    const parseError = xmlDoc.querySelector("parsererror");
+                    if (parseError) {
+                        console.error("Error parsing XML:", parseError);
+                        throw new Error("Failed to parse RSS feed.");
+                    }
+
+                    const title = xmlDoc.querySelector("channel > title")?.textContent || "Sin título";
+                    const artworkUrl = xmlDoc.querySelector("channel > image > url")?.textContent || xmlDoc.querySelector("channel > itunes\\:image, channel > image")?.getAttribute("href") || "https://placehold.co/300x300/1a202c/ffffff?text=Podcast";
+                    
+                    const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => {
+                        const episodeTitle = item.querySelector("title")?.textContent || "Episodio sin título";
+                        const pubDate = item.querySelector("pubDate")?.textContent || "";
+                        const description = item.querySelector("description, content\\:encoded")?.textContent || "Sin descripción.";
+                        const audioUrl = item.querySelector("enclosure")?.getAttribute("url") || "";
+                        
+                        return {
+                            title: episodeTitle,
+                            pubDate: new Date(pubDate),
+                            description: description.replace(/<[^>]*>/g, '').substring(0, 120) + '...', // Limpiar HTML y truncar
+                            audioUrl: audioUrl,
+                        };
+                    }).filter(ep => ep.audioUrl) // Solo episodios con URL de audio
+                      .sort((a, b) => b.pubDate - a.pubDate); // Ordenar del más nuevo al más viejo
+
+                    const podcastData = { title, artworkUrl, episodes };
+                    podcastCache.set(rssUrl, podcastData);
+                    return podcastData;
+
+                } catch (error) {
+                    console.error(`Error fetching or parsing RSS feed ${rssUrl}:`, error);
+                    return null;
+                }
+            }
+
+            /**
+             * Renderiza la vista principal con la cuadrícula de podcasts.
+             */
+            async function renderPodcastsView() {
+                showView('podcasts');
+                podcastsLoader.classList.remove('hidden');
+                podcastsErrorEl.classList.add('hidden');
+                podcastsGrid.innerHTML = '';
+
+                const podcastPromises = podcasts.map(async (podcast) => {
+                    const data = await fetchAndParseRSS(podcast.rssUrl);
+                    if (data) {
+                        const card = document.createElement('div');
+                        card.className = 'fade-in';
+                        card.innerHTML = `
+                            <img src="${data.artworkUrl}" alt="${data.title}" class="w-full h-auto rounded-lg shadow-lg aspect-square object-cover cursor-pointer transition-transform duration-300 hover:scale-105">
+                            <p class="text-center mt-2 font-semibold text-sm truncate">${data.title}</p>
+                        `;
+                        card.querySelector('img').addEventListener('click', () => renderEpisodesView(podcast.rssUrl));
+                        podcastsGrid.appendChild(card);
+                    }
+                });
+
+                await Promise.all(podcastPromises);
+                podcastsLoader.classList.add('hidden');
+
+                if (podcastsGrid.children.length === 0) {
+                    podcastsErrorEl.classList.remove('hidden');
+                }
+            }
+
+            /**
+             * Renderiza la vista de episodios para un podcast específico.
+             * @param {string} rssUrl - La URL del feed del podcast a mostrar.
+             */
+            async function renderEpisodesView(rssUrl) {
+                showView('episodes');
+                episodesLoader.classList.remove('hidden');
+                episodesErrorEl.classList.add('hidden');
+                podcastHeader.innerHTML = '';
+                episodesList.innerHTML = '';
+
+                const data = await fetchAndParseRSS(rssUrl);
+
+                if (!data) {
+                    episodesLoader.classList.add('hidden');
+                    episodesErrorEl.classList.remove('hidden');
+                    return;
+                }
+
+                podcastHeader.innerHTML = `
+                    <img src="${data.artworkUrl}" alt="${data.title}" class="w-32 h-32 mx-auto rounded-lg shadow-xl mb-3">
+                    <h1 class="text-2xl font-bold">${data.title}</h1>
+                `;
+
+                data.episodes.forEach(episode => {
+                    const episodeEl = document.createElement('div');
+                    episodeEl.className = 'p-3 mb-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors duration-200';
+                    episodeEl.innerHTML = `
+                        <p class="font-bold">${episode.title}</p>
+                        <p class="text-xs text-gray-400 mt-1">${episode.pubDate.toLocaleDateString()}</p>
+                        <p class="text-sm text-gray-300 mt-2">${episode.description}</p>
+                    `;
+                    episodeEl.addEventListener('click', () => playEpisode(episode, data));
+                    episodesList.appendChild(episodeEl);
+                });
+
+                episodesLoader.classList.add('hidden');
+            }
+
+            /**
+             * Inicia la reproducción de un episodio.
+             * @param {object} episode - El objeto del episodio.
+             * @param {object} podcastData - Los datos del podcast al que pertenece.
+             */
+            function playEpisode(episode, podcastData) {
+                audioElement.src = episode.audioUrl;
+                audioElement.play();
+
+                player.classList.remove('hidden');
+                playerEpisodeTitle.textContent = episode.title;
+                playerPodcastTitle.textContent = podcastData.title;
+                playerArtwork.src = podcastData.artworkUrl;
+                playerPlayPauseBtn.innerHTML = pauseIcon;
+                
+                updateMediaSession(episode, podcastData);
+            }
+
+            /**
+             * Cambia entre la vista de podcasts y la de episodios.
+             * @param {'podcasts' | 'episodes'} viewName - El nombre de la vista a mostrar.
+             */
+            function showView(viewName) {
+                podcastsView.classList.toggle('hidden', viewName !== 'podcasts');
+                episodesView.classList.toggle('hidden', viewName !== 'episodes');
+                if (viewName === 'episodes') {
+                    window.scrollTo(0, 0);
+                }
+            }
+
+            /**
+             * Actualiza la Media Session API con la información del episodio actual.
+             */
+            function updateMediaSession(episode, podcastData) {
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: episode.title,
+                        artist: podcastData.title,
+                        album: 'Podcasts',
+                        artwork: [{ src: podcastData.artworkUrl, sizes: '512x512', type: 'image/png' }]
+                    });
+
+                    // Asignar manejadores de acciones
+                    navigator.mediaSession.setActionHandler('play', () => audioElement.play());
+                    navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
+                    navigator.mediaSession.setActionHandler('stop', () => {
+                        audioElement.pause();
+                        audioElement.currentTime = 0;
+                        player.classList.add('hidden');
+                    });
+                    navigator.mediaSession.setActionHandler('seekbackward', () => { audioElement.currentTime -= 15; });
+                    navigator.mediaSession.setActionHandler('seekforward', () => { audioElement.currentTime += 30; });
+                }
+            }
+
+            // --- EVENT LISTENERS ---
+
+            backToPodcastsBtn.addEventListener('click', () => renderPodcastsView());
+
+            playerPlayPauseBtn.addEventListener('click', () => {
+                if (audioElement.paused) {
+                    audioElement.play();
+                } else {
+                    audioElement.pause();
+                }
+            });
+
+            audioElement.addEventListener('play', () => {
+                playerPlayPauseBtn.innerHTML = pauseIcon;
+                navigator.mediaSession.playbackState = "playing";
+            });
+
+            audioElement.addEventListener('pause', () => {
+                playerPlayPauseBtn.innerHTML = playIcon;
+                navigator.mediaSession.playbackState = "paused";
+            });
+
+            audioElement.addEventListener('timeupdate', () => {
+                if (audioElement.duration) {
+                    const progress = (audioElement.currentTime / audioElement.duration) * 100;
+                    playerProgress.value = progress;
+                }
+            });
+            
+            audioElement.addEventListener('ended', () => {
+                // Opcional: reproducir el siguiente episodio
+                player.classList.add('hidden');
+            });
+
+            // --- INICIALIZACIÓN ---
+            renderPodcastsView();
+        });
+    </script>
+</body>
+</html>
