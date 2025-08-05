@@ -199,7 +199,6 @@
                     podcastsLoader.classList.remove('hidden');
                 }
 
-                // Renderizar inmediatamente desde la lista (usando caché de localStorage si existe)
                 podcasts.forEach(podcast => {
                     const cachedInfo = metadataCache[podcast.rssUrl];
                     const card = document.createElement('div');
@@ -216,9 +215,7 @@
                     podcastsGrid.appendChild(card);
                 });
 
-                // Actualizar los datos en segundo plano
                 const updatePromises = podcasts.map(async (podcast) => {
-                    // Solo fetchear si no está en caché o la caché no tiene imagen
                     if (!metadataCache[podcast.rssUrl] || metadataCache[podcast.rssUrl].artworkUrl.includes('placehold')) {
                         const feedData = await fetchAndParseRSS(podcast.rssUrl);
                         if (feedData) {
@@ -233,7 +230,6 @@
                     }
                 });
 
-                // Cuando todas las actualizaciones terminen, guardar la caché y ocultar el loader
                 Promise.allSettled(updatePromises).then(() => {
                     localStorage.setItem('podcastMetadataCache', JSON.stringify(metadataCache));
                     podcastsLoader.classList.add('hidden');
@@ -303,16 +299,31 @@
                         album: 'Podcasts',
                         artwork: [{ src: podcastData.artworkUrl, sizes: '512x512', type: 'image/png' }]
                     });
+                    
+                    // --- INICIO DE LA MODIFICACIÓN ---
+                    // Se definen todas las acciones para asegurar que el widget de Android muestre todos los controles.
+                    
+                    // Acción de Play/Pausa
                     navigator.mediaSession.setActionHandler('play', () => audioElement.play());
                     navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
+                    
+                    // Acciones de Avance y Retroceso
+                    navigator.mediaSession.setActionHandler('seekbackward', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); });
+                    navigator.mediaSession.setActionHandler('seekforward', () => { audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30); });
+
+                    // Acciones de Pista Anterior/Siguiente. Se ponen a null para indicar que no están disponibles,
+                    // pero su mera presencia ayuda a que se muestren los otros controles en algunas versiones de Android.
+                    navigator.mediaSession.setActionHandler('previoustrack', null);
+                    navigator.mediaSession.setActionHandler('nexttrack', null);
+
+                    // Acción de Detener
                     navigator.mediaSession.setActionHandler('stop', () => {
                         audioElement.pause();
                         audioElement.currentTime = 0;
                         player.classList.add('hidden');
                         localStorage.removeItem('playbackState');
                     });
-                    navigator.mediaSession.setActionHandler('seekbackward', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); });
-                    navigator.mediaSession.setActionHandler('seekforward', () => { audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30); });
+                     // --- FIN DE LA MODIFICACIÓN ---
                 }
             }
             
