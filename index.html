@@ -239,6 +239,9 @@
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
             let episodeCache = new Map();
+            let currentPodcast = null;
+            let currentEpisode = null;
+            let isPlaying = false;
             
             // --- FUNCIONES ---
             async function fetchAndParseEpisodes(rssUrl) {
@@ -287,6 +290,7 @@
             }
 
             async function renderEpisodesView(podcast) {
+                currentPodcast = podcast;
                 showView('episodes');
                 episodesLoader.classList.remove('hidden');
                 episodesErrorEl.classList.add('hidden');
@@ -333,18 +337,20 @@
             }
 
             function playEpisode(episode, podcast) {
+                currentEpisode = episode;
                 audioElement.src = episode.audioUrl;
                 audioElement.play().catch(e => console.error("Error al reproducir:", e));
-                const state = { episode, podcast };
-                updatePlayerUI(state);
-                setupMediaSession(state);
+                updatePlayerUI(episode, podcast);
+                setupMediaSession(episode, podcast);
+                isPlaying = true;
             }
 
-            function updatePlayerUI(state) {
+            function updatePlayerUI(episode, podcast) {
                 player.classList.remove('hidden');
-                playerEpisodeTitle.textContent = state.episode.title;
-                playerPodcastTitle.textContent = state.podcast.name;
-                playerArtwork.src = state.podcast.artworkUrl;
+                playerEpisodeTitle.textContent = episode.title;
+                playerPodcastTitle.textContent = podcast.name;
+                playerArtwork.src = podcast.artworkUrl;
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
 
             function showView(viewName) {
@@ -353,29 +359,62 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            function setupMediaSession(state) {
+            function setupMediaSession(episode, podcast) {
                 if (!('mediaSession' in navigator)) return;
+                
+                // Configurar metadatos
                 navigator.mediaSession.metadata = new MediaMetadata({
-                    title: state.episode.title,
-                    artist: state.podcast.name,
-                    artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512' }]
+                    title: episode.title,
+                    artist: podcast.name,
+                    artwork: [
+                        { src: podcast.artworkUrl, sizes: '96x96' },
+                        { src: podcast.artworkUrl, sizes: '128x128' },
+                        { src: podcast.artworkUrl, sizes: '192x192' },
+                        { src: podcast.artworkUrl, sizes: '256x256' },
+                        { src: podcast.artworkUrl, sizes: '384x384' },
+                        { src: podcast.artworkUrl, sizes: '512x512' }
+                    ]
                 });
-                navigator.mediaSession.setActionHandler('play', () => audioElement.play());
-                navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
-                navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-                    const skipTime = details.seekOffset || 15;
-                    audioElement.currentTime = Math.max(audioElement.currentTime - skipTime, 0);
+                
+                // Configurar acciones
+                navigator.mediaSession.setActionHandler('play', () => {
+                    audioElement.play();
+                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    navigator.mediaSession.playbackState = "playing";
+                });
+                
+                navigator.mediaSession.setActionHandler('pause', () => {
+                    audioElement.pause();
+                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    navigator.mediaSession.playbackState = "paused";
+                });
+                
+                navigator.mediaSession.setActionHandler('seekbackward', () => {
+                    audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
                     updatePositionState();
                 });
-                navigator.mediaSession.setActionHandler('seekforward', (details) => {
-                    const skipTime = details.seekOffset || 30;
-                    audioElement.currentTime = Math.min(audioElement.currentTime + skipTime, audioElement.duration);
+                
+                navigator.mediaSession.setActionHandler('seekforward', () => {
+                    audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30);
                     updatePositionState();
                 });
+                
+                navigator.mediaSession.setActionHandler('previoustrack', () => {
+                    console.log('previoustrack');
+                });
+                
+                navigator.mediaSession.setActionHandler('nexttrack', () => {
+                    console.log('nexttrack');
+                });
+                
+                // Estado inicial
+                navigator.mediaSession.playbackState = "playing";
+                updatePositionState();
             }
 
             function updatePositionState() {
                 if (!('mediaSession' in navigator) || !audioElement.duration) return;
+                
                 navigator.mediaSession.setPositionState({
                     duration: audioElement.duration,
                     playbackRate: audioElement.playbackRate,
@@ -386,12 +425,35 @@
             function restorePlaybackState() {
                 const savedStateJSON = localStorage.getItem('playbackState');
                 if (!savedStateJSON) return;
-                const savedState = JSON.parse(savedStateJSON);
-                if (!savedState.podcast || !savedState.episode) return;
-                audioElement.src = savedState.episode.audioUrl;
-                audioElement.currentTime = savedState.currentTime || 0;
-                updatePlayerUI(savedState);
-                setupMediaSession(savedState);
+                
+                try {
+                    const savedState = JSON.parse(savedStateJSON);
+                    if (!savedState.podcast || !savedState.episode) return;
+                    
+                    // Buscar el podcast y episodio en los datos predefinidos
+                    const podcast = podcasts.find(p => p.name === savedState.podcast.name);
+                    if (!podcast) return;
+                    
+                    const episode = {
+                        title: savedState.episode.title,
+                        audioUrl: savedState.episode.audioUrl
+                    };
+                    
+                    // Actualizar la UI del reproductor
+                    updatePlayerUI(episode, podcast);
+                    
+                    // Configurar la sesión multimedia
+                    setupMediaSession(episode, podcast);
+                    
+                    // Solo restaurar si se estaba reproduciendo
+                    if (savedState.isPlaying) {
+                        audioElement.src = episode.audioUrl;
+                        audioElement.currentTime = savedState.currentTime || 0;
+                        audioElement.play().catch(e => console.log("Auto-play bloqueado:", e));
+                    }
+                } catch (e) {
+                    console.error('Error restoring playback state:', e);
+                }
             }
 
             function formatTime(seconds) {
@@ -403,54 +465,109 @@
 
             // --- EVENT LISTENERS ---
             backToPodcastsBtn.addEventListener('click', renderPodcastsView);
-            playerCloseBtn.addEventListener('click', () => { player.classList.add('hidden'); audioElement.pause(); });
-            playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
-            playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); });
-            playerForwardBtn.addEventListener('click', () => { audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30); });
+            
+            playerCloseBtn.addEventListener('click', () => { 
+                player.classList.add('hidden'); 
+                audioElement.pause();
+                isPlaying = false;
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            });
+            
+            playerPlayPauseBtn.addEventListener('click', () => { 
+                if (audioElement.paused) {
+                    audioElement.play();
+                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.playbackState = "playing";
+                    }
+                } else {
+                    audioElement.pause();
+                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    if ('mediaSession' in navigator) {
+                        navigator.mediaSession.playbackState = "paused";
+                    }
+                }
+            });
+            
+            playerRewindBtn.addEventListener('click', () => { 
+                audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
+                updatePositionState();
+            });
+            
+            playerForwardBtn.addEventListener('click', () => { 
+                audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30);
+                updatePositionState();
+            });
 
             progressContainer.addEventListener('click', (e) => {
                 const rect = progressContainer.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
                 audioElement.currentTime = percent * audioElement.duration;
+                updatePositionState();
             });
 
-            audioElement.addEventListener('play', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; navigator.mediaSession.playbackState = "playing"; });
-            audioElement.addEventListener('pause', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; navigator.mediaSession.playbackState = "paused"; });
-            audioElement.addEventListener('ended', () => { localStorage.removeItem('playbackState'); });
+            audioElement.addEventListener('play', () => { 
+                isPlaying = true;
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.playbackState = "playing";
+                }
+            });
+            
+            audioElement.addEventListener('pause', () => { 
+                isPlaying = false;
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.playbackState = "paused";
+                }
+            });
+            
+            audioElement.addEventListener('ended', () => { 
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                isPlaying = false;
+            });
             
             audioElement.addEventListener('timeupdate', () => {
                 if (!audioElement.duration) return;
-                progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
+                
+                const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
+                progressBar.style.width = `${progressPercent}%`;
                 currentTimeEl.textContent = formatTime(audioElement.currentTime);
-                updatePositionState(); // **LA CLAVE: Actualiza la notificación constantemente**
-                const savedStateJSON = localStorage.getItem('playbackState');
-                if (savedStateJSON) {
-                    const currentState = JSON.parse(savedStateJSON);
-                    currentState.currentTime = audioElement.currentTime;
-                    localStorage.setItem('playbackState', JSON.stringify(currentState));
+                
+                // Actualizar la posición en la Media Session
+                updatePositionState();
+                
+                // Guardar el estado de reproducción
+                if (currentPodcast && currentEpisode) {
+                    const state = {
+                        episode: {
+                            title: currentEpisode.title,
+                            audioUrl: currentEpisode.audioUrl
+                        },
+                        podcast: {
+                            name: currentPodcast.name,
+                            artworkUrl: currentPodcast.artworkUrl
+                        },
+                        currentTime: audioElement.currentTime,
+                        isPlaying: isPlaying
+                    };
+                    localStorage.setItem('playbackState', JSON.stringify(state));
                 }
             });
 
             audioElement.addEventListener('loadedmetadata', () => {
                 durationEl.textContent = formatTime(audioElement.duration);
-                updatePositionState(); // Actualiza la notificación con la duración
-            });
-            
-            audioElement.addEventListener('playing', () => {
-                const savedStateJSON = localStorage.getItem('playbackState');
-                if (!savedStateJSON) { // Solo guardar si no existe para no sobreescribir el podcast/episodio
-                    const state = {
-                        episode: { title: playerEpisodeTitle.textContent, audioUrl: audioElement.src },
-                        podcast: { name: playerPodcastTitle.textContent, artworkUrl: playerArtwork.src }
-                    };
-                    localStorage.setItem('playbackState', JSON.stringify(state));
-                }
+                updatePositionState();
             });
 
             // --- INICIALIZACIÓN ---
             function init() {
                 renderPodcastsView();
                 restorePlaybackState();
+                
+                // Verificar si el reproductor debería mostrarse al inicio
+                const savedState = localStorage.getItem('playbackState');
+                if (!savedState) {
+                    player.classList.add('hidden');
+                }
             }
             init();
         });
