@@ -28,17 +28,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        progress[value]::-webkit-progress-bar { 
-            background-color: #4a5568; 
-            border-radius: 9999px; 
-        }
-        
-        progress[value]::-webkit-progress-value { 
-            background: linear-gradient(to right, var(--primary), var(--primary-dark)); 
-            border-radius: 9999px; 
-            transition: width 0.1s linear; 
-        }
-        
         .player-shadow { 
             box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.5); 
         }
@@ -68,6 +57,7 @@
             background-color: #4a5568;
             border-radius: 2px;
             overflow: hidden;
+            cursor: pointer;
         }
         
         .progress-bar {
@@ -96,18 +86,6 @@
         .control-btn:hover {
             color: var(--primary);
             transform: scale(1.1);
-        }
-        
-        .skeleton {
-            background: linear-gradient(90deg, #1e293b 25%, #2d3748 50%, #1e293b 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-            border-radius: 8px;
-        }
-        
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
         }
     </style>
 </head>
@@ -195,24 +173,22 @@
         </div>
         
         <div class="flex items-center mb-3">
-            <span id="current-time" class="text-xs text-gray-400 w-10">0:00</span>
-            <div class="flex-grow mx-2 relative">
-                <div class="progress-container">
-                    <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
-                </div>
+            <span id="current-time" class="text-xs text-gray-400 w-10 text-center">0:00</span>
+            <div class="flex-grow mx-2 relative progress-container">
+                <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
             </div>
-            <span id="duration" class="text-xs text-gray-400 w-10">0:00</span>
+            <span id="duration" class="text-xs text-gray-400 w-10 text-center">0:00</span>
         </div>
         
         <div class="flex justify-center items-center space-x-8">
             <button id="player-rewind" class="control-btn text-2xl text-gray-300">
-                <i class="fas fa-step-backward"></i>
+                <i class="fas fa-backward-step"></i>
             </button>
             <button id="player-play-pause" class="play-btn w-12 h-12 rounded-full flex items-center justify-center text-xl">
                 <i class="fas fa-play"></i>
             </button>
             <button id="player-forward" class="control-btn text-2xl text-gray-300">
-                <i class="fas fa-step-forward"></i>
+                <i class="fas fa-forward-step"></i>
             </button>
         </div>
     </div>
@@ -242,13 +218,12 @@
             const playerRewindBtn = document.getElementById('player-rewind');
             const playerForwardBtn = document.getElementById('player-forward');
             const progressBar = document.getElementById('progress-bar');
+            const progressContainer = document.querySelector('.progress-container');
             const currentTimeEl = document.getElementById('current-time');
             const durationEl = document.getElementById('duration');
 
             // --- DATOS Y ESTADO ---
             const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-            
-            // DATOS PRE-CARGADOS PARA CARGA INSTANTÁNEA
             const podcasts = [
                 { name: "A dos bandas", rssUrl: "https://www.omnycontent.com/d/playlist/7e594858-42ba-4ecb-86d8-ad1a002e5281/1d39fbf3-b41a-4c54-88ec-adcd0136c774/df3205fa-ee92-4df4-9308-adcd0136c791/podcast.rss", artworkUrl: "https://www.omnycontent.com/d/playlist/7e594858-42ba-4ecb-86d8-ad1a002e5281/1d39fbf3-b41a-4c54-88ec-adcd0136c774/df3205fa-ee92-4df4-9308-adcd0136c791/image.jpg?t=1729520499&size=Large" },
                 { name: "Brazalete Negro", rssUrl: "https://www.primaverasound.com/radio/shows/brazalete-negro?action=rss", artworkUrl: "https://assets-img.primaverasound.com/1400x1400/2022/ps-single/images/noticias/2022/psb/facebook/brazaletenegro_ed_2400x1256_20220516085356.jpg" },
@@ -263,36 +238,26 @@
                 { name: "Tiempo de Juego", rssUrl: "https://www.cope.es/api/es/programas/tiempo-de-juego/audios/rss.xml", artworkUrl: "https://imagenes.cope.es/uploads/2025/01/20/original_678e8defc69bc.jpeg" },
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
+            let episodeCache = new Map();
             
-            let sessionCache = new Map();
-            let currentPodcast = null;
-            let currentEpisode = null;
-
-            // --- FUNCIONES PRINCIPALES ---
-
+            // --- FUNCIONES ---
             async function fetchAndParseEpisodes(rssUrl) {
-                if (sessionCache.has(rssUrl)) return sessionCache.get(rssUrl);
-
+                if (episodeCache.has(rssUrl)) return episodeCache.get(rssUrl);
                 try {
                     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`);
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    
+                    if (!response.ok) throw new Error(`HTTP error!`);
                     const text = await response.text();
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(text, "application/xml");
-
-                    if (xmlDoc.querySelector("parsererror")) { throw new Error("Failed to parse RSS feed."); }
-
+                    if (xmlDoc.querySelector("parsererror")) throw new Error("Failed to parse RSS feed.");
                     const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => ({
                         title: item.querySelector("title")?.textContent || "Episodio sin título",
                         pubDate: new Date(item.querySelector("pubDate")?.textContent || ""),
                         description: (item.querySelector("description, content\\:encoded")?.textContent || "Sin descripción.").replace(/<[^>]*>/g, '').substring(0, 120) + '...',
                         audioUrl: item.querySelector("enclosure")?.getAttribute("url") || "",
                     })).filter(ep => ep.audioUrl).sort((a, b) => b.pubDate - a.pubDate);
-                        
-                    sessionCache.set(rssUrl, episodes);
+                    episodeCache.set(rssUrl, episodes);
                     return episodes;
-
                 } catch (error) {
                     console.error(`Error fetching RSS feed ${rssUrl}:`, error);
                     return null;
@@ -301,12 +266,8 @@
 
             function renderPodcastsView() {
                 showView('podcasts');
-                podcastsGrid.innerHTML = '';
-
-                podcasts.forEach(podcast => {
-                    const card = document.createElement('div');
-                    card.className = 'fade-in card-hover';
-                    card.innerHTML = `
+                podcastsGrid.innerHTML = podcasts.map(podcast => `
+                    <div class="fade-in card-hover" data-rss-url="${podcast.rssUrl}">
                         <div class="relative">
                             <img src="${podcast.artworkUrl}" alt="${podcast.name}" 
                                 class="w-full h-auto rounded-xl shadow-xl aspect-square object-cover cursor-pointer" 
@@ -315,50 +276,37 @@
                                 <p class="text-center font-semibold text-white truncate">${podcast.name}</p>
                             </div>
                         </div>
-                    `;
-                    card.querySelector('img').addEventListener('click', () => renderEpisodesView(podcast));
-                    podcastsGrid.appendChild(card);
+                    </div>
+                `).join('');
+                podcastsGrid.querySelectorAll('[data-rss-url]').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const clickedPodcast = podcasts.find(p => p.rssUrl === card.dataset.rssUrl);
+                        if(clickedPodcast) renderEpisodesView(clickedPodcast);
+                    });
                 });
             }
 
             async function renderEpisodesView(podcast) {
-                currentPodcast = podcast;
                 showView('episodes');
                 episodesLoader.classList.remove('hidden');
                 episodesErrorEl.classList.add('hidden');
-                podcastHeader.innerHTML = '';
                 episodesList.innerHTML = '';
-
                 podcastHeader.innerHTML = `
                     <img src="${podcast.artworkUrl}" alt="${podcast.name}" 
                          class="w-40 h-40 mx-auto rounded-xl shadow-2xl mb-4 border-2 border-orange-500/50">
                     <h1 class="text-2xl font-bold">${podcast.name}</h1>
-                    <div class="mt-2 flex justify-center space-x-3">
-                        <button class="px-4 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg font-medium">
-                            <i class="fas fa-play mr-2"></i> Reproducir todo
-                        </button>
-                        <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium">
-                            <i class="fas fa-star mr-2"></i> Favorito
-                        </button>
-                    </div>
                 `;
-                
                 const episodes = await fetchAndParseEpisodes(podcast.rssUrl);
-
+                episodesLoader.classList.add('hidden');
                 if (!episodes) {
-                    episodesLoader.classList.add('hidden');
                     episodesErrorEl.classList.remove('hidden');
-                    episodesErrorEl.querySelector('button').addEventListener('click', () => renderEpisodesView(podcast));
+                    episodesErrorEl.querySelector('button').onclick = () => renderEpisodesView(podcast);
                     return;
                 }
-
                 episodesCountEl.textContent = episodes.length;
-
                 if (episodes.length > 0) {
-                    episodes.forEach((episode, index) => {
-                        const episodeEl = document.createElement('div');
-                        episodeEl.className = 'episode-card p-4 bg-gray-800/50 rounded-xl cursor-pointer';
-                        episodeEl.innerHTML = `
+                    episodesList.innerHTML = episodes.map((episode, index) => `
+                        <div class="episode-card p-4 bg-gray-800/50 rounded-xl cursor-pointer" data-episode-url="${episode.audioUrl}">
                             <div class="flex items-start">
                                 <div class="mr-4 text-orange-400 font-bold text-sm">${index + 1}</div>
                                 <div class="flex-grow">
@@ -366,37 +314,28 @@
                                     <p class="text-xs text-gray-400 mt-1 flex items-center">
                                         <i class="far fa-calendar mr-1"></i> ${episode.pubDate.toLocaleDateString()}
                                     </p>
-                                    <p class="text-sm text-gray-300 mt-2">${episode.description}</p>
                                 </div>
-                                <div class="ml-2 text-gray-500 text-sm">
-                                    <i class="fas fa-play-circle text-lg"></i>
+                                <div class="ml-2 text-gray-500 text-lg">
+                                    <i class="fas fa-play-circle"></i>
                                 </div>
                             </div>
-                        `;
-                        episodeEl.addEventListener('click', () => playEpisode(episode, podcast));
-                        episodesList.appendChild(episodeEl);
+                        </div>
+                    `).join('');
+                    episodesList.querySelectorAll('[data-episode-url]').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const clickedEpisode = episodes.find(e => e.audioUrl === item.dataset.episodeUrl);
+                            if(clickedEpisode) playEpisode(clickedEpisode, podcast);
+                        });
                     });
                 } else {
-                     episodesList.innerHTML = `<div class="text-center py-10 bg-gray-800/30 rounded-xl">
-                        <i class="fas fa-inbox text-3xl text-gray-500 mb-3"></i>
-                        <p class="text-gray-400">No se encontraron episodios en este podcast.</p>
-                     </div>`;
+                     episodesList.innerHTML = `<div class="text-center py-10 bg-gray-800/30 rounded-xl"><p class="text-gray-400">No se encontraron episodios.</p></div>`;
                 }
-                episodesLoader.classList.add('hidden');
             }
 
             function playEpisode(episode, podcast) {
-                currentEpisode = episode;
                 audioElement.src = episode.audioUrl;
                 audioElement.play().catch(e => console.error("Error al reproducir:", e));
-                
-                const state = { 
-                    currentTime: 0, 
-                    episode, 
-                    podcast,
-                    isPlaying: true
-                };
-                
+                const state = { episode, podcast };
                 updatePlayerUI(state);
                 setupMediaSession(state);
             }
@@ -406,9 +345,6 @@
                 playerEpisodeTitle.textContent = state.episode.title;
                 playerPodcastTitle.textContent = state.podcast.name;
                 playerArtwork.src = state.podcast.artworkUrl;
-                
-                // Actualizar botón de play/pause
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
 
             function showView(viewName) {
@@ -417,202 +353,105 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            // SOLUCIÓN: Configuración completa de Media Session CON CORRECCIÓN DE TIEMPO
             function setupMediaSession(state) {
-                if ('mediaSession' in navigator) {
-                    // 1. Configurar metadatos
-                    navigator.mediaSession.metadata = new MediaMetadata({
-                        title: state.episode.title,
-                        artist: state.podcast.name,
-                        artwork: [
-                            { src: state.podcast.artworkUrl, sizes: '96x96' },
-                            { src: state.podcast.artworkUrl, sizes: '128x128' },
-                            { src: state.podcast.artworkUrl, sizes: '192x192' },
-                            { src: state.podcast.artworkUrl, sizes: '256x256' },
-                            { src: state.podcast.artworkUrl, sizes: '384x384' },
-                            { src: state.podcast.artworkUrl, sizes: '512x512' }
-                        ]
-                    });
-
-                    // 2. Definir acciones
-                    navigator.mediaSession.setActionHandler('play', () => audioElement.play());
-                    navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
-                    navigator.mediaSession.setActionHandler('seekbackward', () => {
-                        audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
-                        updatePositionState(); // Actualizar estado después de cambiar
-                    });
-                    navigator.mediaSession.setActionHandler('seekforward', () => {
-                        audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30);
-                        updatePositionState(); // Actualizar estado después de cambiar
-                    });
-                    
-                    // 3. Configurar estado de posición INICIAL
+                if (!('mediaSession' in navigator)) return;
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: state.episode.title,
+                    artist: state.podcast.name,
+                    artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512' }]
+                });
+                navigator.mediaSession.setActionHandler('play', () => audioElement.play());
+                navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
+                navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                    const skipTime = details.seekOffset || 15;
+                    audioElement.currentTime = Math.max(audioElement.currentTime - skipTime, 0);
                     updatePositionState();
-                    
-                    // 4. Actualizar estado de reproducción
-                    navigator.mediaSession.playbackState = "playing";
-                }
+                });
+                navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                    const skipTime = details.seekOffset || 30;
+                    audioElement.currentTime = Math.min(audioElement.currentTime + skipTime, audioElement.duration);
+                    updatePositionState();
+                });
             }
 
-            // NUEVA FUNCIÓN: Actualizar posición de reproducción en Media Session
             function updatePositionState() {
-                if ('mediaSession' in navigator && audioElement.duration) {
-                    navigator.mediaSession.setPositionState({
-                        duration: audioElement.duration,
-                        position: audioElement.currentTime,
-                        playbackRate: 1
-                    });
-                }
-            }
-
-            function updateMediaSessionState() {
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.playbackState = 
-                        audioElement.paused ? "paused" : "playing";
-                }
+                if (!('mediaSession' in navigator) || !audioElement.duration) return;
+                navigator.mediaSession.setPositionState({
+                    duration: audioElement.duration,
+                    playbackRate: audioElement.playbackRate,
+                    position: audioElement.currentTime
+                });
             }
             
             function restorePlaybackState() {
                 const savedStateJSON = localStorage.getItem('playbackState');
                 if (!savedStateJSON) return;
-
                 const savedState = JSON.parse(savedStateJSON);
                 if (!savedState.podcast || !savedState.episode) return;
-                
-                // Buscar el podcast en la lista
-                const podcast = podcasts.find(p => p.name === savedState.podcast.name);
-                if (!podcast) return;
-                
                 audioElement.src = savedState.episode.audioUrl;
                 audioElement.currentTime = savedState.currentTime || 0;
-
                 updatePlayerUI(savedState);
                 setupMediaSession(savedState);
-                
-                // Solo reproducir si estaba en marcha
-                if (savedState.isPlaying) {
-                    audioElement.play().catch(e => console.log("Auto-play bloqueado:", e));
-                }
             }
 
             function formatTime(seconds) {
+                if (isNaN(seconds)) return '0:00';
                 const mins = Math.floor(seconds / 60);
                 const secs = Math.floor(seconds % 60);
                 return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             }
 
             // --- EVENT LISTENERS ---
-            backToPodcastsBtn.addEventListener('click', () => renderPodcastsView());
-            playerCloseBtn.addEventListener('click', () => {
-                player.classList.add('hidden');
-                audioElement.pause();
-            });
-            
-            playerPlayPauseBtn.addEventListener('click', () => {
-                if (audioElement.paused) {
-                    audioElement.play();
-                } else {
-                    audioElement.pause();
-                }
-            });
-            
-            playerRewindBtn.addEventListener('click', () => {
-                audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
-                updatePositionState(); // Actualizar estado después de rebobinar
-            });
-            
-            playerForwardBtn.addEventListener('click', () => {
-                audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30);
-                updatePositionState(); // Actualizar estado después de adelantar
-            });
+            backToPodcastsBtn.addEventListener('click', renderPodcastsView);
+            playerCloseBtn.addEventListener('click', () => { player.classList.add('hidden'); audioElement.pause(); });
+            playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
+            playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); });
+            playerForwardBtn.addEventListener('click', () => { audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30); });
 
-            // Barra de progreso clicable
-            progressBar.parentElement.addEventListener('click', (e) => {
-                const rect = progressBar.parentElement.getBoundingClientRect();
+            progressContainer.addEventListener('click', (e) => {
+                const rect = progressContainer.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
                 audioElement.currentTime = percent * audioElement.duration;
-                updatePositionState(); // Actualizar estado después de cambiar posición
             });
 
-            audioElement.addEventListener('play', () => {
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                updateMediaSessionState();
-            });
+            audioElement.addEventListener('play', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; navigator.mediaSession.playbackState = "playing"; });
+            audioElement.addEventListener('pause', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; navigator.mediaSession.playbackState = "paused"; });
+            audioElement.addEventListener('ended', () => { localStorage.removeItem('playbackState'); });
             
-            audioElement.addEventListener('pause', () => {
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                updateMediaSessionState();
-            });
-
             audioElement.addEventListener('timeupdate', () => {
-                if (audioElement.duration) {
-                    const percent = (audioElement.currentTime / audioElement.duration) * 100;
-                    progressBar.style.width = `${percent}%`;
-                    
-                    currentTimeEl.textContent = formatTime(audioElement.currentTime);
-                    durationEl.textContent = formatTime(audioElement.duration);
-                    
-                    // Actualizar Media Session con la posición actual
-                    updatePositionState();
-                    
-                    // Guardar estado cada 5 segundos
-                    if (currentPodcast && currentEpisode) {
-                        const state = {
-                            currentTime: audioElement.currentTime,
-                            episode: currentEpisode,
-                            podcast: currentPodcast,
-                            isPlaying: !audioElement.paused
-                        };
-                        localStorage.setItem('playbackState', JSON.stringify(state));
-                    }
+                if (!audioElement.duration) return;
+                progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
+                currentTimeEl.textContent = formatTime(audioElement.currentTime);
+                updatePositionState(); // **LA CLAVE: Actualiza la notificación constantemente**
+                const savedStateJSON = localStorage.getItem('playbackState');
+                if (savedStateJSON) {
+                    const currentState = JSON.parse(savedStateJSON);
+                    currentState.currentTime = audioElement.currentTime;
+                    localStorage.setItem('playbackState', JSON.stringify(currentState));
                 }
             });
-            
+
             audioElement.addEventListener('loadedmetadata', () => {
-                if (audioElement.duration) {
-                    durationEl.textContent = formatTime(audioElement.duration);
-                    
-                    // Actualizar Media Session con la duración y posición
-                    updatePositionState();
-                }
+                durationEl.textContent = formatTime(audioElement.duration);
+                updatePositionState(); // Actualiza la notificación con la duración
             });
             
-            audioElement.addEventListener('ended', () => {
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                localStorage.removeItem('playbackState');
+            audioElement.addEventListener('playing', () => {
+                const savedStateJSON = localStorage.getItem('playbackState');
+                if (!savedStateJSON) { // Solo guardar si no existe para no sobreescribir el podcast/episodio
+                    const state = {
+                        episode: { title: playerEpisodeTitle.textContent, audioUrl: audioElement.src },
+                        podcast: { name: playerPodcastTitle.textContent, artworkUrl: playerArtwork.src }
+                    };
+                    localStorage.setItem('playbackState', JSON.stringify(state));
+                }
             });
 
             // --- INICIALIZACIÓN ---
             function init() {
                 renderPodcastsView();
                 restorePlaybackState();
-                
-                // Mostrar mensaje de bienvenida
-                setTimeout(() => {
-                    const welcomeMsg = document.createElement('div');
-                    welcomeMsg.className = 'fixed bottom-20 left-4 right-4 bg-orange-500 text-white p-4 rounded-xl shadow-lg z-30 fade-in';
-                    welcomeMsg.innerHTML = `
-                        <div class="flex items-center">
-                            <i class="fas fa-headphones-alt text-xl mr-3"></i>
-                            <div>
-                                <p class="font-bold">¡Bienvenido a Podcast App!</p>
-                                <p class="text-sm">Selecciona un podcast para comenzar a escuchar</p>
-                            </div>
-                            <button class="ml-auto text-white" onclick="this.parentElement.parentElement.remove()">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    `;
-                    document.body.appendChild(welcomeMsg);
-                    
-                    // Auto-ocultar después de 5 segundos
-                    setTimeout(() => {
-                        welcomeMsg.classList.add('opacity-0');
-                        setTimeout(() => welcomeMsg.remove(), 500);
-                    }, 5000);
-                }, 1000);
             }
-
             init();
         });
     </script>
