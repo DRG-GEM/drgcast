@@ -81,11 +81,25 @@
         
         .control-btn {
             transition: all 0.2s ease;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .control-btn:hover {
-            color: var(--primary);
+            background-color: rgba(255, 255, 255, 0.1);
             transform: scale(1.1);
+        }
+        
+        .rewind-btn {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .forward-btn {
+            background-color: rgba(255, 255, 255, 0.05);
         }
     </style>
 </head>
@@ -181,14 +195,14 @@
         </div>
         
         <div class="flex justify-center items-center space-x-8">
-            <button id="player-rewind" class="control-btn text-2xl text-gray-300">
-                <i class="fas fa-backward-step"></i>
+            <button id="player-rewind" class="control-btn rewind-btn text-xl text-gray-300">
+                <i class="fas fa-backward"></i>
             </button>
             <button id="player-play-pause" class="play-btn w-12 h-12 rounded-full flex items-center justify-center text-xl">
                 <i class="fas fa-play"></i>
             </button>
-            <button id="player-forward" class="control-btn text-2xl text-gray-300">
-                <i class="fas fa-forward-step"></i>
+            <button id="player-forward" class="control-btn forward-btn text-xl text-gray-300">
+                <i class="fas fa-forward"></i>
             </button>
         </div>
     </div>
@@ -242,6 +256,7 @@
             let currentPodcast = null;
             let currentEpisode = null;
             let isPlaying = false;
+            let lastSaveTime = 0;
             
             // --- FUNCIONES ---
             async function fetchAndParseEpisodes(rssUrl) {
@@ -343,10 +358,10 @@
                 updatePlayerUI(episode, podcast);
                 setupMediaSession(episode, podcast);
                 isPlaying = true;
+                player.classList.remove('hidden');
             }
 
             function updatePlayerUI(episode, podcast) {
-                player.classList.remove('hidden');
                 playerEpisodeTitle.textContent = episode.title;
                 playerPodcastTitle.textContent = podcast.name;
                 playerArtwork.src = podcast.artworkUrl;
@@ -381,12 +396,14 @@
                     audioElement.play();
                     playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
                     navigator.mediaSession.playbackState = "playing";
+                    isPlaying = true;
                 });
                 
                 navigator.mediaSession.setActionHandler('pause', () => {
                     audioElement.pause();
                     playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
                     navigator.mediaSession.playbackState = "paused";
+                    isPlaying = false;
                 });
                 
                 navigator.mediaSession.setActionHandler('seekbackward', () => {
@@ -397,14 +414,6 @@
                 navigator.mediaSession.setActionHandler('seekforward', () => {
                     audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 30);
                     updatePositionState();
-                });
-                
-                navigator.mediaSession.setActionHandler('previoustrack', () => {
-                    console.log('previoustrack');
-                });
-                
-                navigator.mediaSession.setActionHandler('nexttrack', () => {
-                    console.log('nexttrack');
                 });
                 
                 // Estado inicial
@@ -430,7 +439,7 @@
                     const savedState = JSON.parse(savedStateJSON);
                     if (!savedState.podcast || !savedState.episode) return;
                     
-                    // Buscar el podcast y episodio en los datos predefinidos
+                    // Buscar el podcast en los datos predefinidos
                     const podcast = podcasts.find(p => p.name === savedState.podcast.name);
                     if (!podcast) return;
                     
@@ -440,17 +449,26 @@
                     };
                     
                     // Actualizar la UI del reproductor
-                    updatePlayerUI(episode, podcast);
+                    player.classList.remove('hidden');
+                    playerEpisodeTitle.textContent = episode.title;
+                    playerPodcastTitle.textContent = podcast.name;
+                    playerArtwork.src = podcast.artworkUrl;
+                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
                     
                     // Configurar la sesión multimedia
                     setupMediaSession(episode, podcast);
                     
-                    // Solo restaurar si se estaba reproduciendo
-                    if (savedState.isPlaying) {
-                        audioElement.src = episode.audioUrl;
-                        audioElement.currentTime = savedState.currentTime || 0;
-                        audioElement.play().catch(e => console.log("Auto-play bloqueado:", e));
+                    // Cargar el audio y establecer el tiempo
+                    audioElement.src = episode.audioUrl;
+                    audioElement.currentTime = savedState.currentTime || 0;
+                    
+                    // Actualizar la barra de progreso y tiempos
+                    if (savedState.duration) {
+                        progressBar.style.width = `${(savedState.currentTime / savedState.duration) * 100}%`;
+                        currentTimeEl.textContent = formatTime(savedState.currentTime || 0);
+                        durationEl.textContent = formatTime(savedState.duration || 0);
                     }
+                    
                 } catch (e) {
                     console.error('Error restoring playback state:', e);
                 }
@@ -471,6 +489,7 @@
                 audioElement.pause();
                 isPlaying = false;
                 playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                localStorage.removeItem('playbackState');
             });
             
             playerPlayPauseBtn.addEventListener('click', () => { 
@@ -480,12 +499,14 @@
                     if ('mediaSession' in navigator) {
                         navigator.mediaSession.playbackState = "playing";
                     }
+                    isPlaying = true;
                 } else {
                     audioElement.pause();
                     playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
                     if ('mediaSession' in navigator) {
                         navigator.mediaSession.playbackState = "paused";
                     }
+                    isPlaying = false;
                 }
             });
             
@@ -535,21 +556,26 @@
                 // Actualizar la posición en la Media Session
                 updatePositionState();
                 
-                // Guardar el estado de reproducción
-                if (currentPodcast && currentEpisode) {
-                    const state = {
-                        episode: {
-                            title: currentEpisode.title,
-                            audioUrl: currentEpisode.audioUrl
-                        },
-                        podcast: {
-                            name: currentPodcast.name,
-                            artworkUrl: currentPodcast.artworkUrl
-                        },
-                        currentTime: audioElement.currentTime,
-                        isPlaying: isPlaying
-                    };
-                    localStorage.setItem('playbackState', JSON.stringify(state));
+                // Guardar el estado de reproducción (máximo cada 2 segundos)
+                const now = Date.now();
+                if (now - lastSaveTime > 2000) {
+                    if (currentPodcast && currentEpisode) {
+                        const state = {
+                            episode: {
+                                title: currentEpisode.title,
+                                audioUrl: currentEpisode.audioUrl
+                            },
+                            podcast: {
+                                name: currentPodcast.name,
+                                artworkUrl: currentPodcast.artworkUrl
+                            },
+                            currentTime: audioElement.currentTime,
+                            duration: audioElement.duration,
+                            isPlaying: isPlaying
+                        };
+                        localStorage.setItem('playbackState', JSON.stringify(state));
+                    }
+                    lastSaveTime = now;
                 }
             });
 
@@ -563,9 +589,8 @@
                 renderPodcastsView();
                 restorePlaybackState();
                 
-                // Verificar si el reproductor debería mostrarse al inicio
-                const savedState = localStorage.getItem('playbackState');
-                if (!savedState) {
+                // Si no hay estado guardado, ocultar el reproductor
+                if (!localStorage.getItem('playbackState')) {
                     player.classList.add('hidden');
                 }
             }
