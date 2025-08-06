@@ -174,15 +174,18 @@
             // --- LÓGICA DE REPRODUCCIÓN SIMPLE Y DIRECTA ---
 
             function playEpisode(episode, podcast) {
-                updatePlayerUI({ episode, podcast });
-                player.classList.remove('hidden');
+    updatePlayerUI({ episode, podcast });
+    player.classList.remove('hidden');
 
-                audioElement.src = episode.audioUrl;
-                audioElement.currentTime = 0;
-                audioElement.play();
+    audioElement.src = episode.audioUrl;
 
-                setupMediaSession({ episode, podcast });
-            }
+    // AÑADE ESTA LÍNEA TEMPORALMENTE PARA LA PRUEBA:
+    audioElement.src = 'https://storage.googleapis.com/material-design/publish/material_v_12/assets/0B_x5PTKP3_44N1I0UWtXX0otQjQ/sound.mp3';
+
+    audioElement.currentTime = 0;
+    audioElement.play();
+    setupMediaSession({ episode, podcast });
+}
 
             function setupMediaSession(state) {
                 if (!('mediaSession' in navigator)) return;
