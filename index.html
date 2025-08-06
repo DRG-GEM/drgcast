@@ -355,41 +355,42 @@
 
             function setupMediaSession(state) {
                 if (!('mediaSession' in navigator)) return;
+                
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: state.episode.title,
                     artist: state.podcast.name,
                     artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512' }]
                 });
 
-                navigator.mediaSession.setActionHandler('play', () => audioElement.play());
-                navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
-                
-                // CORRECCIÓN: Usar details.seekOffset para mayor compatibilidad
-                navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-                    const skipTime = details.seekOffset || 15;
-                    audioElement.currentTime = Math.max(audioElement.currentTime - skipTime, 0);
-                    updatePositionState();
-                });
-                navigator.mediaSession.setActionHandler('seekforward', (details) => {
-                    const skipTime = details.seekOffset || 30;
-                    audioElement.currentTime = Math.min(audioElement.currentTime + skipTime, audioElement.duration);
-                    updatePositionState();
-                });
-                
-                // CORRECCIÓN: Añadir handler para el scrubbing en la notificación
-                navigator.mediaSession.setActionHandler('seekto', (details) => {
-                    if (details.fastSeek && 'fastSeek' in audioElement) {
-                      audioElement.fastSeek(details.seekTime);
-                    } else {
-                      audioElement.currentTime = details.seekTime;
-                    }
-                    updatePositionState();
-                });
+                // REESCRITURA COMPLETA DE LOS HANDLERS
+                try {
+                    navigator.mediaSession.setActionHandler('play', () => { audioElement.play(); });
+                    navigator.mediaSession.setActionHandler('pause', () => { audioElement.pause(); });
+                    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                        const skipTime = details.seekOffset || 15;
+                        audioElement.currentTime = Math.max(audioElement.currentTime - skipTime, 0);
+                        updatePositionState();
+                    });
+                    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                        const skipTime = details.seekOffset || 30;
+                        audioElement.currentTime = Math.min(audioElement.currentTime + skipTime, audioElement.duration);
+                        updatePositionState();
+                    });
+                    navigator.mediaSession.setActionHandler('seekto', (details) => {
+                        if (details.fastSeek && 'fastSeek' in audioElement) {
+                          audioElement.fastSeek(details.seekTime);
+                        } else {
+                          audioElement.currentTime = details.seekTime;
+                        }
+                        updatePositionState();
+                    });
+                } catch (error) {
+                    console.log('Error setting up media session handlers:', error);
+                }
             }
 
-            // CORRECCIÓN: Función central para actualizar el estado de la notificación
             function updatePositionState() {
-                if (!('mediaSession' in navigator) || !audioElement.duration) return;
+                if (!('mediaSession' in navigator) || !isFinite(audioElement.duration)) return;
                 navigator.mediaSession.setPositionState({
                     duration: audioElement.duration,
                     playbackRate: audioElement.playbackRate,
@@ -454,10 +455,10 @@
             });
             
             audioElement.addEventListener('timeupdate', () => {
-                if (!audioElement.duration) return;
+                if (!isFinite(audioElement.duration)) return;
                 progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
                 currentTimeEl.textContent = formatTime(audioElement.currentTime);
-                updatePositionState(); // **LA CLAVE: Actualiza la notificación constantemente**
+                updatePositionState();
                 
                 const savedStateJSON = localStorage.getItem('playbackState');
                 if (savedStateJSON) {
@@ -469,7 +470,7 @@
 
             audioElement.addEventListener('loadedmetadata', () => {
                 durationEl.textContent = formatTime(audioElement.duration);
-                updatePositionState(); // Actualiza la notificación con la duración
+                updatePositionState();
             });
             
             audioElement.addEventListener('playing', () => {
@@ -491,4 +492,4 @@
         });
     </script>
 </body>
-</ht
+</html>
