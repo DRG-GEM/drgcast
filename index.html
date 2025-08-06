@@ -177,10 +177,7 @@
     updatePlayerUI({ episode, podcast });
     player.classList.remove('hidden');
 
-    audioElement.src = episode.audioUrl;
-
-    // AÑADE ESTA LÍNEA TEMPORALMENTE PARA LA PRUEBA:
-    audioElement.src = 'https://storage.googleapis.com/material-design/publish/material_v_12/assets/0B_x5PTKP3_44N1I0UWtXX0otQjQ/sound.mp3';
+    audioElement.src = CORS_PROXY + encodeURIComponent(episode.audioUrl);
 
     audioElement.currentTime = 0;
     audioElement.play();
