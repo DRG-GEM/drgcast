@@ -90,7 +90,6 @@
     </style>
 </head>
 <body class="text-white">
-    <!-- Header -->
     <header class="bg-gray-800/80 backdrop-blur-sm py-4 px-6 border-b border-gray-700 sticky top-0 z-10">
         <div class="flex justify-between items-center">
             <h1 class="text-2xl font-bold flex items-center">
@@ -108,10 +107,8 @@
         </div>
     </header>
 
-    <!-- Contenedor principal de la aplicación -->
     <div id="app-container" class="pb-40 px-4">
 
-        <!-- Vista: Mis Podcasts -->
         <div id="podcasts-view" class="py-4">
             <div class="flex justify-between items-center mb-6">
                 <h1 class="text-2xl font-bold text-orange-500">Mis Podcasts</h1>
@@ -125,11 +122,9 @@
                 </div>
             </div>
             <div id="podcasts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                <!-- Las carátulas de los podcasts se insertarán aquí al instante -->
-            </div>
+                </div>
         </div>
 
-        <!-- Vista: Episodios de un Podcast -->
         <div id="episodes-view" class="hidden py-4 fade-in">
             <button id="back-to-podcasts" class="mb-6 text-orange-400 font-semibold flex items-center">
                 <i class="fas fa-arrow-left mr-2"></i> Volver a podcasts
@@ -159,7 +154,6 @@
         </div>
     </div>
 
-    <!-- Reproductor de Audio Fijo -->
     <div id="player" class="hidden fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-lg border-t border-gray-700 p-4 player-shadow fade-in z-20">
         <div class="flex items-center mb-3">
             <img id="player-artwork" src="" class="w-14 h-14 rounded-lg mr-3 shadow-md" alt="Carátula del episodio">
@@ -193,7 +187,6 @@
         </div>
     </div>
 
-    <!-- Elemento de audio (oculto) -->
     <audio id="audio-element"></audio>
 
     <script>
@@ -239,6 +232,7 @@
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
             let episodeCache = new Map();
+            let currentPlaybackState = null; // <-- CAMBIO 1: Variable para guardar el estado
             
             // --- FUNCIONES ---
             async function fetchAndParseEpisodes(rssUrl) {
@@ -335,9 +329,12 @@
             function playEpisode(episode, podcast) {
                 audioElement.src = episode.audioUrl;
                 audioElement.play().catch(e => console.error("Error al reproducir:", e));
-                const state = { episode, podcast };
-                updatePlayerUI(state);
-                setupMediaSession(state);
+                
+                // <-- CAMBIO 2: Guardamos el estado en la variable global
+                currentPlaybackState = { episode, podcast };
+
+                updatePlayerUI(currentPlaybackState);
+                setupMediaSession(currentPlaybackState);
                 player.classList.remove('hidden');
             }
 
@@ -359,10 +356,9 @@
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: state.episode.title,
                     artist: state.podcast.name,
-                    artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512' }]
+                    artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512', type: 'image/jpeg' }]
                 });
 
-                // REESCRITURA COMPLETA DE LOS HANDLERS
                 try {
                     navigator.mediaSession.setActionHandler('play', () => { audioElement.play(); });
                     navigator.mediaSession.setActionHandler('pause', () => { audioElement.pause(); });
@@ -406,6 +402,9 @@
                     if (!savedState.podcast || !savedState.episode) return;
                     audioElement.src = savedState.episode.audioUrl;
                     audioElement.currentTime = savedState.currentTime || 0;
+                    
+                    currentPlaybackState = { episode: savedState.episode, podcast: savedState.podcast };
+
                     updatePlayerUI(savedState);
                     setupMediaSession(savedState);
                     player.classList.remove('hidden');
@@ -428,6 +427,7 @@
                 player.classList.add('hidden'); 
                 audioElement.pause();
                 localStorage.removeItem('playbackState');
+                currentPlaybackState = null;
             });
             playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
             playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); updatePositionState(); });
@@ -439,6 +439,15 @@
                 const percent = (e.clientX - rect.left) / rect.width;
                 audioElement.currentTime = percent * audioElement.duration;
                 updatePositionState();
+            });
+            
+            // <-- CAMBIO 3: El nuevo Event Listener que arregla la notificación
+            audioElement.addEventListener('durationchange', () => {
+                if (isFinite(audioElement.duration) && currentPlaybackState) {
+                    console.log(`Duración detectada: ${audioElement.duration}. Reconfigurando Media Session.`);
+                    setupMediaSession(currentPlaybackState);
+                    updatePositionState();
+                }
             });
 
             audioElement.addEventListener('play', () => { 
@@ -452,6 +461,7 @@
             audioElement.addEventListener('ended', () => { 
                 localStorage.removeItem('playbackState'); 
                 playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                currentPlaybackState = null;
             });
             
             audioElement.addEventListener('timeupdate', () => {
@@ -460,11 +470,12 @@
                 currentTimeEl.textContent = formatTime(audioElement.currentTime);
                 updatePositionState();
                 
-                const savedStateJSON = localStorage.getItem('playbackState');
-                if (savedStateJSON) {
-                    const currentState = JSON.parse(savedStateJSON);
-                    currentState.currentTime = audioElement.currentTime;
-                    localStorage.setItem('playbackState', JSON.stringify(currentState));
+                if (currentPlaybackState) {
+                    const stateToSave = {
+                        ...currentPlaybackState,
+                        currentTime: audioElement.currentTime
+                    };
+                    localStorage.setItem('playbackState', JSON.stringify(stateToSave));
                 }
             });
 
@@ -474,13 +485,13 @@
             });
             
             audioElement.addEventListener('playing', () => {
-                const state = {
-                    episode: { title: playerEpisodeTitle.textContent, audioUrl: audioElement.src },
-                    podcast: { name: playerPodcastTitle.textContent, artworkUrl: playerArtwork.src },
-                    currentTime: audioElement.currentTime,
-                    duration: audioElement.duration
-                };
-                localStorage.setItem('playbackState', JSON.stringify(state));
+                if (currentPlaybackState) {
+                    const stateToSave = {
+                        ...currentPlaybackState,
+                        currentTime: audioElement.currentTime,
+                    };
+                    localStorage.setItem('playbackState', JSON.stringify(stateToSave));
+                }
             });
 
             // --- INICIALIZACIÓN ---
