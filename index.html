@@ -162,140 +162,30 @@
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
             let episodeCache = new Map();
-            let currentPlaybackState = null;
             
             // --- FUNCIONES ---
-            async function fetchAndParseEpisodes(rssUrl) {
-                if (episodeCache.has(rssUrl)) return episodeCache.get(rssUrl);
-                try {
-                    const response = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`);
-                    if (!response.ok) throw new Error(`HTTP error!`);
-                    const text = await response.text();
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(text, "application/xml");
-                    if (xmlDoc.querySelector("parsererror")) throw new Error("Failed to parse RSS feed.");
-                    const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => ({
-                        title: item.querySelector("title")?.textContent || "Episodio sin título",
-                        pubDate: new Date(item.querySelector("pubDate")?.textContent || ""),
-                        audioUrl: item.querySelector("enclosure")?.getAttribute("url") || "",
-                    })).filter(ep => ep.audioUrl).sort((a, b) => b.pubDate - a.pubDate);
-                    episodeCache.set(rssUrl, episodes);
-                    return episodes;
-                } catch (error) {
-                    console.error(`Error fetching RSS feed ${rssUrl}:`, error);
-                    return null;
-                }
-            }
+            async function fetchAndParseEpisodes(rssUrl) { if (episodeCache.has(rssUrl)) return episodeCache.get(rssUrl); try { const r = await fetch(`${CORS_PROXY}${encodeURIComponent(rssUrl)}`); if (!r.ok) throw new Error(`HTTP error!`); const t = await r.text(), p = new DOMParser(), d = p.parseFromString(t, "application/xml"); if (d.querySelector("parsererror")) throw new Error("Failed to parse RSS feed."); const e = Array.from(d.querySelectorAll("channel > item")).map(i => ({ title: i.querySelector("title")?.textContent || "Sin título", pubDate: new Date(i.querySelector("pubDate")?.textContent || ""), audioUrl: i.querySelector("enclosure")?.getAttribute("url") || "" })).filter(ep => ep.audioUrl).sort((a, b) => b.pubDate - a.pubDate); episodeCache.set(rssUrl, e); return e } catch (error) { console.error(`Error fetching RSS feed ${rssUrl}:`, error); return null } }
+            function renderPodcastsView() { showView('podcasts'); podcastsGrid.innerHTML = podcasts.map(p => `<div class="fade-in card-hover" data-rss-url="${p.rssUrl}"><div class="relative"><img src="${p.artworkUrl}" alt="${p.name}" class="w-full h-auto rounded-xl shadow-xl aspect-square object-cover cursor-pointer" onerror="this.onerror=null;this.src='https://placehold.co/300x300/1e293b/f97316?text=Podcast';"><div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 rounded-b-xl"><p class="text-center font-semibold text-white truncate">${p.name}</p></div></div></div>`).join(''); podcastsGrid.querySelectorAll('[data-rss-url]').forEach(card => card.addEventListener('click', () => { const p = podcasts.find(pod => pod.rssUrl === card.dataset.rssUrl); if (p) renderEpisodesView(p); })); }
+            async function renderEpisodesView(podcast) { showView('episodes'); episodesLoader.classList.remove('hidden'); episodesErrorEl.classList.add('hidden'); episodesList.innerHTML = ''; podcastHeader.innerHTML = `<img src="${podcast.artworkUrl}" alt="${podcast.name}" class="w-40 h-40 mx-auto rounded-xl shadow-2xl mb-4 border-2 border-orange-500/50"><h1 class="text-2xl font-bold">${podcast.name}</h1>`; const episodes = await fetchAndParseEpisodes(podcast.rssUrl); episodesLoader.classList.add('hidden'); if (!episodes) { episodesErrorEl.classList.remove('hidden'); episodesErrorEl.querySelector('button').onclick = () => renderEpisodesView(podcast); return; } episodesCountEl.textContent = episodes.length; episodesList.innerHTML = episodes.length > 0 ? episodes.map((ep, i) => `<div class="episode-card p-4 bg-gray-800/50 rounded-xl cursor-pointer" data-episode-url="${ep.audioUrl}"><div class="flex items-start"><div class="mr-4 text-orange-400 font-bold text-sm">${i + 1}</div><div class="flex-grow"><p class="font-bold text-white">${ep.title}</p><p class="text-xs text-gray-400 mt-1 flex items-center"><i class="far fa-calendar mr-1"></i> ${ep.pubDate.toLocaleDateString()}</p></div><div class="ml-2 text-gray-500 text-lg"><i class="fas fa-play-circle"></i></div></div></div>`).join('') : `<div class="text-center py-10 bg-gray-800/30 rounded-xl"><p class="text-gray-400">No se encontraron episodios.</p></div>`; episodesList.querySelectorAll('[data-episode-url]').forEach(item => item.addEventListener('click', () => { const ep = episodes.find(e => e.audioUrl === item.dataset.episodeUrl); if (ep) playEpisode(ep, podcast); })); }
+            function updatePlayerUI(state) { playerEpisodeTitle.textContent = state.episode.title; playerPodcastTitle.textContent = state.podcast.name; playerArtwork.src = state.podcast.artworkUrl; }
+            function showView(viewName) { podcastsView.classList.toggle('hidden', viewName !== 'podcasts'); episodesView.classList.toggle('hidden', viewName !== 'episodes'); if (viewName === 'episodes') window.scrollTo(0, 0); }
+            function formatTime(seconds) { if (isNaN(seconds) || !isFinite(seconds)) return '0:00'; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${mins}:${secs < 10 ? '0' : ''}${secs}`; }
 
-            function renderPodcastsView() {
-                showView('podcasts');
-                podcastsGrid.innerHTML = podcasts.map(podcast => `
-                    <div class="fade-in card-hover" data-rss-url="${podcast.rssUrl}">
-                        <div class="relative">
-                            <img src="${podcast.artworkUrl}" alt="${podcast.name}" 
-                                class="w-full h-auto rounded-xl shadow-xl aspect-square object-cover cursor-pointer" 
-                                onerror="this.onerror=null;this.src='https://placehold.co/300x300/1e293b/f97316?text=Podcast';">
-                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 rounded-b-xl">
-                                <p class="text-center font-semibold text-white truncate">${podcast.name}</p>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-                podcastsGrid.querySelectorAll('[data-rss-url]').forEach(card => {
-                    card.addEventListener('click', () => {
-                        const clickedPodcast = podcasts.find(p => p.rssUrl === card.dataset.rssUrl);
-                        if(clickedPodcast) renderEpisodesView(clickedPodcast);
-                    });
-                });
-            }
-
-            async function renderEpisodesView(podcast) {
-                showView('episodes');
-                episodesLoader.classList.remove('hidden');
-                episodesErrorEl.classList.add('hidden');
-                episodesList.innerHTML = '';
-                podcastHeader.innerHTML = `
-                    <img src="${podcast.artworkUrl}" alt="${podcast.name}" 
-                         class="w-40 h-40 mx-auto rounded-xl shadow-2xl mb-4 border-2 border-orange-500/50">
-                    <h1 class="text-2xl font-bold">${podcast.name}</h1>
-                `;
-                const episodes = await fetchAndParseEpisodes(podcast.rssUrl);
-                episodesLoader.classList.add('hidden');
-                if (!episodes) {
-                    episodesErrorEl.classList.remove('hidden');
-                    episodesErrorEl.querySelector('button').onclick = () => renderEpisodesView(podcast);
-                    return;
-                }
-                episodesCountEl.textContent = episodes.length;
-                if (episodes.length > 0) {
-                    episodesList.innerHTML = episodes.map((episode, index) => `
-                        <div class="episode-card p-4 bg-gray-800/50 rounded-xl cursor-pointer" data-episode-url="${episode.audioUrl}">
-                            <div class="flex items-start">
-                                <div class="mr-4 text-orange-400 font-bold text-sm">${index + 1}</div>
-                                <div class="flex-grow">
-                                    <p class="font-bold text-white">${episode.title}</p>
-                                    <p class="text-xs text-gray-400 mt-1 flex items-center">
-                                        <i class="far fa-calendar mr-1"></i> ${episode.pubDate.toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div class="ml-2 text-gray-500 text-lg">
-                                    <i class="fas fa-play-circle"></i>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                    episodesList.querySelectorAll('[data-episode-url]').forEach(item => {
-                        item.addEventListener('click', () => {
-                            const clickedEpisode = episodes.find(e => e.audioUrl === item.dataset.episodeUrl);
-                            if(clickedEpisode) playEpisode(clickedEpisode, podcast);
-                        });
-                    });
-                } else {
-                     episodesList.innerHTML = `<div class="text-center py-10 bg-gray-800/30 rounded-xl"><p class="text-gray-400">No se encontraron episodios.</p></div>`;
-                }
-            }
-            
-            function updatePlayerUI(state) {
-                playerEpisodeTitle.textContent = state.episode.title;
-                playerPodcastTitle.textContent = state.podcast.name;
-                playerArtwork.src = state.podcast.artworkUrl;
-            }
-
-            function showView(viewName) {
-                podcastsView.classList.toggle('hidden', viewName !== 'podcasts');
-                episodesView.classList.toggle('hidden', viewName !== 'episodes');
-                if (viewName === 'episodes') window.scrollTo(0, 0);
-            }
-
-            function updatePositionState() {
-                if (!('mediaSession' in navigator) || !isFinite(audioElement.duration)) return;
-                navigator.mediaSession.setPositionState({
-                    duration: audioElement.duration,
-                    playbackRate: audioElement.playbackRate,
-                    position: audioElement.currentTime
-                });
-            }
-
-            function formatTime(seconds) {
-                if (isNaN(seconds)) return '0:00';
-                const mins = Math.floor(seconds / 60);
-                const secs = Math.floor(seconds % 60);
-                return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-            }
-
-            // --- LÓGICA DE REPRODUCCIÓN REESTRUCTURADA ---
+            // --- LÓGICA DE REPRODUCCIÓN SIMPLE Y DIRECTA ---
 
             function playEpisode(episode, podcast) {
-                currentPlaybackState = { episode, podcast };
-                updatePlayerUI(currentPlaybackState);
+                updatePlayerUI({ episode, podcast });
                 player.classList.remove('hidden');
+
                 audioElement.src = episode.audioUrl;
                 audioElement.currentTime = 0;
-                audioElement.play().catch(e => console.error("Error al reproducir:", e));
+                audioElement.play();
+
+                setupMediaSession({ episode, podcast });
             }
 
             function setupMediaSession(state) {
-                if (!('mediaSession' in navigator) || !state) return;
+                if (!('mediaSession' in navigator)) return;
 
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: state.episode.title,
@@ -303,27 +193,34 @@
                     album: state.podcast.name,
                     artwork: [{ src: state.podcast.artworkUrl }]
                 });
-                
+
                 navigator.mediaSession.setActionHandler('play', () => audioElement.play());
                 navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
-
-                navigator.mediaSession.setActionHandler('seekbackward', null);
-                navigator.mediaSession.setActionHandler('seekforward', null);
-                navigator.mediaSession.setActionHandler('seekto', null);
-
-                if (isFinite(audioElement.duration)) {
-                    console.log("Duración finita. Configurando manejadores de búsqueda.");
-                    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-                        audioElement.currentTime = Math.max(audioElement.currentTime - (details.seekOffset || 15), 0);
-                        updatePositionState();
-                    });
-                    navigator.mediaSession.setActionHandler('seekforward', (details) => {
-                        audioElement.currentTime = Math.min(audioElement.currentTime + (details.seekOffset || 30), audioElement.duration);
-                        updatePositionState();
-                    });
-                    navigator.mediaSession.setActionHandler('seekto', (details) => {
+                navigator.mediaSession.setActionHandler('seekbackward', () => updateSeekTime(-15));
+                navigator.mediaSession.setActionHandler('seekforward', () => updateSeekTime(30));
+                navigator.mediaSession.setActionHandler('seekto', (details) => {
+                    if (details.fastSeek && 'fastSeek' in audioElement) {
+                        audioElement.fastSeek(details.seekTime);
+                    } else {
                         audioElement.currentTime = details.seekTime;
-                        updatePositionState();
+                    }
+                    updatePositionState();
+                });
+            }
+            
+            function updateSeekTime(time) {
+                audioElement.currentTime = Math.max(0, Math.min(audioElement.duration, audioElement.currentTime + time));
+                updatePositionState();
+            }
+
+            function updatePositionState() {
+                if (!('mediaSession' in navigator)) return;
+                
+                if (isFinite(audioElement.duration)) {
+                    navigator.mediaSession.setPositionState({
+                        duration: audioElement.duration,
+                        playbackRate: audioElement.playbackRate,
+                        position: audioElement.currentTime
                     });
                 }
             }
@@ -331,29 +228,26 @@
             // --- EVENT LISTENERS ---
             
             backToPodcastsBtn.addEventListener('click', renderPodcastsView);
-            playerCloseBtn.addEventListener('click', () => { player.classList.add('hidden'); audioElement.pause(); currentPlaybackState = null; });
+            playerCloseBtn.addEventListener('click', () => { player.classList.add('hidden'); audioElement.pause(); });
             playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
-            playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); updatePositionState(); });
-            playerForwardBtn.addEventListener('click', () => { audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30); updatePositionState(); });
+            playerRewindBtn.addEventListener('click', () => updateSeekTime(-15));
+            playerForwardBtn.addEventListener('click', () => updateSeekTime(30));
             progressContainer.addEventListener('click', e => { if (!isFinite(audioElement.duration)) return; const r = progressContainer.getBoundingClientRect(); audioElement.currentTime = ((e.clientX - r.left) / r.width) * audioElement.duration; updatePositionState(); });
             
             audioElement.addEventListener('play', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; navigator.mediaSession.playbackState = "playing"; });
             audioElement.addEventListener('pause', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; navigator.mediaSession.playbackState = "paused"; });
-            audioElement.addEventListener('ended', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; currentPlaybackState = null; });
+            audioElement.addEventListener('ended', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; });
             
             audioElement.addEventListener('loadedmetadata', () => {
-                console.log("Metadatos cargados. Duración:", audioElement.duration);
                 durationEl.textContent = formatTime(audioElement.duration);
-                if (currentPlaybackState) {
-                    setupMediaSession(currentPlaybackState);
-                }
                 updatePositionState();
             });
 
             audioElement.addEventListener('timeupdate', () => {
-                if (!isFinite(audioElement.duration)) return;
-                progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
                 currentTimeEl.textContent = formatTime(audioElement.currentTime);
+                if (isFinite(audioElement.duration)) {
+                    progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
+                }
                 updatePositionState();
             });
 
