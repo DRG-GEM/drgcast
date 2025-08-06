@@ -9,6 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#f97316">
+
     <style>
         :root { --primary: #f97316; --primary-dark: #ea580c; }
         body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom, #0f172a, #1e293b); min-height: 100vh; }
@@ -171,29 +175,27 @@
             function showView(viewName) { podcastsView.classList.toggle('hidden', viewName !== 'podcasts'); episodesView.classList.toggle('hidden', viewName !== 'episodes'); if (viewName === 'episodes') window.scrollTo(0, 0); }
             function formatTime(seconds) { if (isNaN(seconds) || !isFinite(seconds)) return '0:00'; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${mins}:${secs < 10 ? '0' : ''}${secs}`; }
 
-            // --- LÓGICA DE REPRODUCCIÓN SIMPLE Y DIRECTA ---
+            // --- LÓGICA DE REPRODUCCIÓN ---
 
             function playEpisode(episode, podcast) {
-    updatePlayerUI({ episode, podcast });
-    player.classList.remove('hidden');
+                updatePlayerUI({ episode, podcast });
+                player.classList.remove('hidden');
 
-    audioElement.src = CORS_PROXY + encodeURIComponent(episode.audioUrl);
+                audioElement.src = CORS_PROXY + encodeURIComponent(episode.audioUrl);
+                audioElement.currentTime = 0;
+                audioElement.play();
 
-    audioElement.currentTime = 0;
-    audioElement.play();
-    setupMediaSession({ episode, podcast });
-}
+                setupMediaSession({ episode, podcast });
+            }
 
             function setupMediaSession(state) {
                 if (!('mediaSession' in navigator)) return;
-
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: state.episode.title,
                     artist: state.podcast.name,
                     album: state.podcast.name,
                     artwork: [{ src: state.podcast.artworkUrl }]
                 });
-
                 navigator.mediaSession.setActionHandler('play', () => audioElement.play());
                 navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
                 navigator.mediaSession.setActionHandler('seekbackward', () => updateSeekTime(-15));
@@ -215,7 +217,6 @@
 
             function updatePositionState() {
                 if (!('mediaSession' in navigator)) return;
-                
                 if (isFinite(audioElement.duration)) {
                     navigator.mediaSession.setPositionState({
                         duration: audioElement.duration,
@@ -253,6 +254,14 @@
 
             // --- INICIALIZACIÓN ---
             renderPodcastsView();
+            
+            // AÑADIDO PARA LA PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(() => console.log('Service Worker registrado con éxito.'))
+                    .catch(error => console.log('Error al registrar el Service Worker:', error));
+            }
+
         });
     </script>
 </body>
