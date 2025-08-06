@@ -72,12 +72,6 @@
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3);
             transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
         }
         
         .play-btn:hover {
@@ -87,66 +81,11 @@
         
         .control-btn {
             transition: all 0.2s ease;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: rgba(255, 255, 255, 0.05);
         }
         
         .control-btn:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--primary);
             transform: scale(1.1);
-        }
-        
-        .rewind-btn::before {
-            content: "";
-            display: block;
-            width: 0;
-            height: 0;
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-right: 15px solid white;
-            position: relative;
-            left: -2px;
-        }
-        
-        .rewind-btn::after {
-            content: "";
-            display: block;
-            width: 0;
-            height: 0;
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-right: 15px solid white;
-            position: relative;
-            left: -8px;
-        }
-        
-        .forward-btn::before {
-            content: "";
-            display: block;
-            width: 0;
-            height: 0;
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-left: 15px solid white;
-            position: relative;
-            left: 2px;
-        }
-        
-        .forward-btn::after {
-            content: "";
-            display: block;
-            width: 0;
-            height: 0;
-            border-top: 10px solid transparent;
-            border-bottom: 10px solid transparent;
-            border-left: 15px solid white;
-            position: relative;
-            left: 8px;
         }
     </style>
 </head>
@@ -242,14 +181,14 @@
         </div>
         
         <div class="flex justify-center items-center space-x-8">
-            <button id="player-rewind" class="control-btn rewind-btn text-xl text-gray-300">
-                <!-- Icono de retroceder personalizado -->
+            <button id="player-rewind" class="control-btn text-xl text-gray-300">
+                 <i class="fas fa-rotate-left"></i>
             </button>
-            <button id="player-play-pause" class="play-btn">
+            <button id="player-play-pause" class="play-btn w-12 h-12 rounded-full flex items-center justify-center text-xl">
                 <i class="fas fa-play"></i>
             </button>
-            <button id="player-forward" class="control-btn forward-btn text-xl text-gray-300">
-                <!-- Icono de avanzar personalizado -->
+            <button id="player-forward" class="control-btn text-xl text-gray-300">
+                <i class="fas fa-rotate-right"></i>
             </button>
         </div>
     </div>
@@ -300,10 +239,6 @@
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
             let episodeCache = new Map();
-            let currentPodcast = null;
-            let currentEpisode = null;
-            let isPlaying = false;
-            let lastSaveTime = 0;
             
             // --- FUNCIONES ---
             async function fetchAndParseEpisodes(rssUrl) {
@@ -352,7 +287,6 @@
             }
 
             async function renderEpisodesView(podcast) {
-                currentPodcast = podcast;
                 showView('episodes');
                 episodesLoader.classList.remove('hidden');
                 episodesErrorEl.classList.add('hidden');
@@ -399,20 +333,18 @@
             }
 
             function playEpisode(episode, podcast) {
-                currentEpisode = episode;
                 audioElement.src = episode.audioUrl;
                 audioElement.play().catch(e => console.error("Error al reproducir:", e));
-                updatePlayerUI(episode, podcast);
-                setupMediaSession(episode, podcast);
-                isPlaying = true;
+                const state = { episode, podcast };
+                updatePlayerUI(state);
+                setupMediaSession(state);
                 player.classList.remove('hidden');
             }
 
-            function updatePlayerUI(episode, podcast) {
-                playerEpisodeTitle.textContent = episode.title;
-                playerPodcastTitle.textContent = podcast.name;
-                playerArtwork.src = podcast.artworkUrl;
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            function updatePlayerUI(state) {
+                playerEpisodeTitle.textContent = state.episode.title;
+                playerPodcastTitle.textContent = state.podcast.name;
+                playerArtwork.src = state.podcast.artworkUrl;
             }
 
             function showView(viewName) {
@@ -421,69 +353,43 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            function setupMediaSession(episode, podcast) {
+            function setupMediaSession(state) {
                 if (!('mediaSession' in navigator)) return;
-                
-                // Configurar metadatos
                 navigator.mediaSession.metadata = new MediaMetadata({
-                    title: episode.title,
-                    artist: podcast.name,
-                    artwork: [
-                        { src: podcast.artworkUrl, sizes: '96x96' },
-                        { src: podcast.artworkUrl, sizes: '128x128' },
-                        { src: podcast.artworkUrl, sizes: '192x192' },
-                        { src: podcast.artworkUrl, sizes: '256x256' },
-                        { src: podcast.artworkUrl, sizes: '384x384' },
-                        { src: podcast.artworkUrl, sizes: '512x512' }
-                    ]
+                    title: state.episode.title,
+                    artist: state.podcast.name,
+                    artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512' }]
                 });
+
+                navigator.mediaSession.setActionHandler('play', () => audioElement.play());
+                navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
                 
-                // Configurar acciones
-                navigator.mediaSession.setActionHandler('play', () => {
-                    audioElement.play();
-                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                    navigator.mediaSession.playbackState = "playing";
-                    isPlaying = true;
-                });
-                
-                navigator.mediaSession.setActionHandler('pause', () => {
-                    audioElement.pause();
-                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    navigator.mediaSession.playbackState = "paused";
-                    isPlaying = false;
-                });
-                
-                // MEJORA: Usar MediaSessionActionDetails para offset de skip
+                // CORRECCIÓN: Usar details.seekOffset para mayor compatibilidad
                 navigator.mediaSession.setActionHandler('seekbackward', (details) => {
                     const skipTime = details.seekOffset || 15;
-                    audioElement.currentTime = Math.max(0, audioElement.currentTime - skipTime);
+                    audioElement.currentTime = Math.max(audioElement.currentTime - skipTime, 0);
                     updatePositionState();
                 });
-                
                 navigator.mediaSession.setActionHandler('seekforward', (details) => {
                     const skipTime = details.seekOffset || 30;
-                    audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + skipTime);
+                    audioElement.currentTime = Math.min(audioElement.currentTime + skipTime, audioElement.duration);
                     updatePositionState();
                 });
                 
-                // NUEVO: Handler para scrub en la notificación
+                // CORRECCIÓN: Añadir handler para el scrubbing en la notificación
                 navigator.mediaSession.setActionHandler('seekto', (details) => {
                     if (details.fastSeek && 'fastSeek' in audioElement) {
-                        audioElement.fastSeek(details.seekTime);
+                      audioElement.fastSeek(details.seekTime);
                     } else {
-                        audioElement.currentTime = details.seekTime;
+                      audioElement.currentTime = details.seekTime;
                     }
                     updatePositionState();
                 });
-                
-                // Estado inicial
-                navigator.mediaSession.playbackState = "playing";
-                updatePositionState();
             }
 
+            // CORRECCIÓN: Función central para actualizar el estado de la notificación
             function updatePositionState() {
                 if (!('mediaSession' in navigator) || !audioElement.duration) return;
-                
                 navigator.mediaSession.setPositionState({
                     duration: audioElement.duration,
                     playbackRate: audioElement.playbackRate,
@@ -494,62 +400,17 @@
             function restorePlaybackState() {
                 const savedStateJSON = localStorage.getItem('playbackState');
                 if (!savedStateJSON) return;
-                
                 try {
                     const savedState = JSON.parse(savedStateJSON);
                     if (!savedState.podcast || !savedState.episode) return;
-                    
-                    // Buscar el podcast en los datos predefinidos
-                    const podcast = podcasts.find(p => p.name === savedState.podcast.name);
-                    if (!podcast) return;
-                    
-                    const episode = {
-                        title: savedState.episode.title,
-                        audioUrl: savedState.episode.audioUrl
-                    };
-                    
-                    // Actualizar la UI del reproductor
+                    audioElement.src = savedState.episode.audioUrl;
+                    audioElement.currentTime = savedState.currentTime || 0;
+                    updatePlayerUI(savedState);
+                    setupMediaSession(savedState);
                     player.classList.remove('hidden');
-                    playerEpisodeTitle.textContent = episode.title;
-                    playerPodcastTitle.textContent = podcast.name;
-                    playerArtwork.src = podcast.artworkUrl;
-                    
-                    // Solo mostrar play/pause basado en el estado guardado
-                    if (savedState.isPlaying) {
-                        playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                    } else {
-                        playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    }
-                    
-                    // Configurar la sesión multimedia
-                    setupMediaSession(episode, podcast);
-                    
-                    // Cargar el audio y establecer el tiempo
-                    audioElement.src = episode.audioUrl;
-                    
-                    // Esperar a que se carguen los metadatos antes de establecer el tiempo
-                    const onLoadedMetadata = () => {
-                        if (audioElement.duration) {
-                            audioElement.currentTime = savedState.currentTime || 0;
-                            
-                            // Actualizar la barra de progreso y tiempos
-                            const progressPercent = ((savedState.currentTime || 0) / audioElement.duration) * 100;
-                            progressBar.style.width = `${progressPercent}%`;
-                            currentTimeEl.textContent = formatTime(savedState.currentTime || 0);
-                            durationEl.textContent = formatTime(audioElement.duration);
-                            
-                            // Si estaba reproduciendo, iniciar la reproducción
-                            if (savedState.isPlaying) {
-                                audioElement.play().catch(e => console.log("Auto-play bloqueado:", e));
-                            }
-                        }
-                        audioElement.removeEventListener('loadedmetadata', onLoadedMetadata);
-                    };
-                    
-                    audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
-                    
                 } catch (e) {
-                    console.error('Error restoring playback state:', e);
+                    console.error("Error al restaurar el estado:", e);
+                    localStorage.removeItem('playbackState');
                 }
             }
 
@@ -562,44 +423,17 @@
 
             // --- EVENT LISTENERS ---
             backToPodcastsBtn.addEventListener('click', renderPodcastsView);
-            
             playerCloseBtn.addEventListener('click', () => { 
                 player.classList.add('hidden'); 
                 audioElement.pause();
-                isPlaying = false;
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
                 localStorage.removeItem('playbackState');
             });
-            
-            playerPlayPauseBtn.addEventListener('click', () => { 
-                if (audioElement.paused) {
-                    audioElement.play();
-                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                    if ('mediaSession' in navigator) {
-                        navigator.mediaSession.playbackState = "playing";
-                    }
-                    isPlaying = true;
-                } else {
-                    audioElement.pause();
-                    playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    if ('mediaSession' in navigator) {
-                        navigator.mediaSession.playbackState = "paused";
-                    }
-                    isPlaying = false;
-                }
-            });
-            
-            playerRewindBtn.addEventListener('click', () => { 
-                audioElement.currentTime = Math.max(0, audioElement.currentTime - 15);
-                updatePositionState();
-            });
-            
-            playerForwardBtn.addEventListener('click', () => { 
-                audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30);
-                updatePositionState();
-            });
+            playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
+            playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); updatePositionState(); });
+            playerForwardBtn.addEventListener('click', () => { audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30); updatePositionState(); });
 
             progressContainer.addEventListener('click', (e) => {
+                if(!audioElement.duration) return;
                 const rect = progressContainer.getBoundingClientRect();
                 const percent = (e.clientX - rect.left) / rect.width;
                 audioElement.currentTime = percent * audioElement.duration;
@@ -607,75 +441,54 @@
             });
 
             audioElement.addEventListener('play', () => { 
-                isPlaying = true;
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.playbackState = "playing";
-                }
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; 
+                navigator.mediaSession.playbackState = "playing"; 
             });
-            
             audioElement.addEventListener('pause', () => { 
-                isPlaying = false;
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.playbackState = "paused";
-                }
+                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; 
+                navigator.mediaSession.playbackState = "paused"; 
             });
-            
             audioElement.addEventListener('ended', () => { 
+                localStorage.removeItem('playbackState'); 
                 playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                isPlaying = false;
             });
             
             audioElement.addEventListener('timeupdate', () => {
                 if (!audioElement.duration) return;
-                
-                const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
-                progressBar.style.width = `${progressPercent}%`;
+                progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
                 currentTimeEl.textContent = formatTime(audioElement.currentTime);
+                updatePositionState(); // **LA CLAVE: Actualiza la notificación constantemente**
                 
-                // Actualizar la posición en la Media Session
-                updatePositionState();
-                
-                // Guardar el estado de reproducción (máximo cada 2 segundos)
-                const now = Date.now();
-                if (now - lastSaveTime > 2000) {
-                    if (currentPodcast && currentEpisode) {
-                        const state = {
-                            episode: {
-                                title: currentEpisode.title,
-                                audioUrl: currentEpisode.audioUrl
-                            },
-                            podcast: {
-                                name: currentPodcast.name,
-                                artworkUrl: currentPodcast.artworkUrl
-                            },
-                            currentTime: audioElement.currentTime,
-                            duration: audioElement.duration,
-                            isPlaying: isPlaying
-                        };
-                        localStorage.setItem('playbackState', JSON.stringify(state));
-                    }
-                    lastSaveTime = now;
+                const savedStateJSON = localStorage.getItem('playbackState');
+                if (savedStateJSON) {
+                    const currentState = JSON.parse(savedStateJSON);
+                    currentState.currentTime = audioElement.currentTime;
+                    localStorage.setItem('playbackState', JSON.stringify(currentState));
                 }
             });
 
-            // MEJORA: Actualizar posición después de cargar metadatos
             audioElement.addEventListener('loadedmetadata', () => {
                 durationEl.textContent = formatTime(audioElement.duration);
-                updatePositionState();
+                updatePositionState(); // Actualiza la notificación con la duración
+            });
+            
+            audioElement.addEventListener('playing', () => {
+                const state = {
+                    episode: { title: playerEpisodeTitle.textContent, audioUrl: audioElement.src },
+                    podcast: { name: playerPodcastTitle.textContent, artworkUrl: playerArtwork.src },
+                    currentTime: audioElement.currentTime,
+                    duration: audioElement.duration
+                };
+                localStorage.setItem('playbackState', JSON.stringify(state));
             });
 
             // --- INICIALIZACIÓN ---
             function init() {
                 renderPodcastsView();
                 restorePlaybackState();
-                
-                // Si no hay estado guardado, ocultar el reproductor
-                if (!localStorage.getItem('playbackState')) {
-                    player.classList.add('hidden');
-                }
             }
             init();
         });
     </script>
 </body>
-</html>
+</ht
