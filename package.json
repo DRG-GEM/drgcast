@@ -1,0 +1,8 @@
+{
+  "name": "podcast-proxy-server",
+  "version": "1.0.0",
+  "description": "Proxy para los audios de la app de podcast",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}
