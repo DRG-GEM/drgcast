@@ -10,83 +10,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
-            --primary: #f97316;
-            --primary-dark: #ea580c;
-        }
-        
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background: linear-gradient(to bottom, #0f172a, #1e293b);
-            min-height: 100vh;
-        }
-        
+        :root { --primary: #f97316; --primary-dark: #ea580c; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom, #0f172a, #1e293b); min-height: 100vh; }
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .player-shadow { 
-            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.5); 
-        }
-        
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .episode-card {
-            transition: all 0.2s ease;
-            border-left: 3px solid transparent;
-        }
-        
-        .episode-card:hover {
-            background: linear-gradient(to right, rgba(249, 115, 22, 0.1), rgba(31, 41, 55, 0.8));
-            border-left: 3px solid var(--primary);
-        }
-        
-        .progress-container {
-            position: relative;
-            height: 4px;
-            background-color: #4a5568;
-            border-radius: 2px;
-            overflow: hidden;
-            cursor: pointer;
-        }
-        
-        .progress-bar {
-            position: absolute;
-            height: 100%;
-            background: linear-gradient(to right, var(--primary), var(--primary-dark));
-            border-radius: 2px;
-            transition: width 0.1s linear;
-        }
-        
-        .play-btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3);
-            transition: all 0.2s ease;
-        }
-        
-        .play-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 15px rgba(249, 115, 22, 0.4);
-        }
-        
-        .control-btn {
-            transition: all 0.2s ease;
-        }
-        
-        .control-btn:hover {
-            color: var(--primary);
-            transform: scale(1.1);
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .player-shadow { box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.5); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); }
+        .episode-card { transition: all 0.2s ease; border-left: 3px solid transparent; }
+        .episode-card:hover { background: linear-gradient(to right, rgba(249, 115, 22, 0.1), rgba(31, 41, 55, 0.8)); border-left: 3px solid var(--primary); }
+        .progress-container { position: relative; height: 4px; background-color: #4a5568; border-radius: 2px; overflow: hidden; cursor: pointer; }
+        .progress-bar { position: absolute; height: 100%; background: linear-gradient(to right, var(--primary), var(--primary-dark)); border-radius: 2px; transition: width 0.1s linear; }
+        .play-btn { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3); transition: all 0.2s ease; }
+        .play-btn:hover { transform: scale(1.05); box-shadow: 0 6px 15px rgba(249, 115, 22, 0.4); }
+        .control-btn { transition: all 0.2s ease; }
+        .control-btn:hover { color: var(--primary); transform: scale(1.1); }
     </style>
 </head>
 <body class="text-white">
@@ -112,14 +50,6 @@
         <div id="podcasts-view" class="py-4">
             <div class="flex justify-between items-center mb-6">
                 <h1 class="text-2xl font-bold text-orange-500">Mis Podcasts</h1>
-                <div class="flex space-x-2">
-                    <button class="px-3 py-1 bg-gray-800 rounded-full text-sm">
-                        <i class="fas fa-sort mr-1"></i> Ordenar
-                    </button>
-                    <button class="px-3 py-1 bg-gray-800 rounded-full text-sm">
-                        <i class="fas fa-filter mr-1"></i> Filtros
-                    </button>
-                </div>
             </div>
             <div id="podcasts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 </div>
@@ -232,7 +162,7 @@
                 { name: "¡El Chiringuito de Jugones!", rssUrl: "https://www.ivoox.com/feed_fg_f11226820_filtro_1.xml", artworkUrl: "https://static-2.ivoox.com/canales/1/1/2/7/3351617207211_XXL.jpg" }
             ];
             let episodeCache = new Map();
-            let currentPlaybackState = null; // <-- CAMBIO 1: Variable para guardar el estado
+            let currentPlaybackState = null;
             
             // --- FUNCIONES ---
             async function fetchAndParseEpisodes(rssUrl) {
@@ -247,7 +177,6 @@
                     const episodes = Array.from(xmlDoc.querySelectorAll("channel > item")).map(item => ({
                         title: item.querySelector("title")?.textContent || "Episodio sin título",
                         pubDate: new Date(item.querySelector("pubDate")?.textContent || ""),
-                        description: (item.querySelector("description, content\\:encoded")?.textContent || "Sin descripción.").replace(/<[^>]*>/g, '').substring(0, 120) + '...',
                         audioUrl: item.querySelector("enclosure")?.getAttribute("url") || "",
                     })).filter(ep => ep.audioUrl).sort((a, b) => b.pubDate - a.pubDate);
                     episodeCache.set(rssUrl, episodes);
@@ -325,19 +254,7 @@
                      episodesList.innerHTML = `<div class="text-center py-10 bg-gray-800/30 rounded-xl"><p class="text-gray-400">No se encontraron episodios.</p></div>`;
                 }
             }
-
-            function playEpisode(episode, podcast) {
-                audioElement.src = episode.audioUrl;
-                audioElement.play().catch(e => console.error("Error al reproducir:", e));
-                
-                // <-- CAMBIO 2: Guardamos el estado en la variable global
-                currentPlaybackState = { episode, podcast };
-
-                updatePlayerUI(currentPlaybackState);
-                setupMediaSession(currentPlaybackState);
-                player.classList.remove('hidden');
-            }
-
+            
             function updatePlayerUI(state) {
                 playerEpisodeTitle.textContent = state.episode.title;
                 playerPodcastTitle.textContent = state.podcast.name;
@@ -350,41 +267,6 @@
                 if (viewName === 'episodes') window.scrollTo(0, 0);
             }
 
-            function setupMediaSession(state) {
-                if (!('mediaSession' in navigator)) return;
-                
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: state.episode.title,
-                    artist: state.podcast.name,
-                    artwork: [{ src: state.podcast.artworkUrl, sizes: '512x512', type: 'image/jpeg' }]
-                });
-
-                try {
-                    navigator.mediaSession.setActionHandler('play', () => { audioElement.play(); });
-                    navigator.mediaSession.setActionHandler('pause', () => { audioElement.pause(); });
-                    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-                        const skipTime = details.seekOffset || 15;
-                        audioElement.currentTime = Math.max(audioElement.currentTime - skipTime, 0);
-                        updatePositionState();
-                    });
-                    navigator.mediaSession.setActionHandler('seekforward', (details) => {
-                        const skipTime = details.seekOffset || 30;
-                        audioElement.currentTime = Math.min(audioElement.currentTime + skipTime, audioElement.duration);
-                        updatePositionState();
-                    });
-                    navigator.mediaSession.setActionHandler('seekto', (details) => {
-                        if (details.fastSeek && 'fastSeek' in audioElement) {
-                          audioElement.fastSeek(details.seekTime);
-                        } else {
-                          audioElement.currentTime = details.seekTime;
-                        }
-                        updatePositionState();
-                    });
-                } catch (error) {
-                    console.log('Error setting up media session handlers:', error);
-                }
-            }
-
             function updatePositionState() {
                 if (!('mediaSession' in navigator) || !isFinite(audioElement.duration)) return;
                 navigator.mediaSession.setPositionState({
@@ -392,26 +274,6 @@
                     playbackRate: audioElement.playbackRate,
                     position: audioElement.currentTime
                 });
-            }
-            
-            function restorePlaybackState() {
-                const savedStateJSON = localStorage.getItem('playbackState');
-                if (!savedStateJSON) return;
-                try {
-                    const savedState = JSON.parse(savedStateJSON);
-                    if (!savedState.podcast || !savedState.episode) return;
-                    audioElement.src = savedState.episode.audioUrl;
-                    audioElement.currentTime = savedState.currentTime || 0;
-                    
-                    currentPlaybackState = { episode: savedState.episode, podcast: savedState.podcast };
-
-                    updatePlayerUI(savedState);
-                    setupMediaSession(savedState);
-                    player.classList.remove('hidden');
-                } catch (e) {
-                    console.error("Error al restaurar el estado:", e);
-                    localStorage.removeItem('playbackState');
-                }
             }
 
             function formatTime(seconds) {
@@ -421,85 +283,82 @@
                 return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             }
 
+            // --- LÓGICA DE REPRODUCCIÓN REESTRUCTURADA ---
+
+            function playEpisode(episode, podcast) {
+                currentPlaybackState = { episode, podcast };
+                updatePlayerUI(currentPlaybackState);
+                player.classList.remove('hidden');
+                audioElement.src = episode.audioUrl;
+                audioElement.currentTime = 0;
+                audioElement.play().catch(e => console.error("Error al reproducir:", e));
+            }
+
+            function setupMediaSession(state) {
+                if (!('mediaSession' in navigator) || !state) return;
+
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: state.episode.title,
+                    artist: state.podcast.name,
+                    album: state.podcast.name,
+                    artwork: [{ src: state.podcast.artworkUrl }]
+                });
+                
+                navigator.mediaSession.setActionHandler('play', () => audioElement.play());
+                navigator.mediaSession.setActionHandler('pause', () => audioElement.pause());
+
+                navigator.mediaSession.setActionHandler('seekbackward', null);
+                navigator.mediaSession.setActionHandler('seekforward', null);
+                navigator.mediaSession.setActionHandler('seekto', null);
+
+                if (isFinite(audioElement.duration)) {
+                    console.log("Duración finita. Configurando manejadores de búsqueda.");
+                    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                        audioElement.currentTime = Math.max(audioElement.currentTime - (details.seekOffset || 15), 0);
+                        updatePositionState();
+                    });
+                    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                        audioElement.currentTime = Math.min(audioElement.currentTime + (details.seekOffset || 30), audioElement.duration);
+                        updatePositionState();
+                    });
+                    navigator.mediaSession.setActionHandler('seekto', (details) => {
+                        audioElement.currentTime = details.seekTime;
+                        updatePositionState();
+                    });
+                }
+            }
+
             // --- EVENT LISTENERS ---
+            
             backToPodcastsBtn.addEventListener('click', renderPodcastsView);
-            playerCloseBtn.addEventListener('click', () => { 
-                player.classList.add('hidden'); 
-                audioElement.pause();
-                localStorage.removeItem('playbackState');
-                currentPlaybackState = null;
-            });
+            playerCloseBtn.addEventListener('click', () => { player.classList.add('hidden'); audioElement.pause(); currentPlaybackState = null; });
             playerPlayPauseBtn.addEventListener('click', () => { if (audioElement.paused) audioElement.play(); else audioElement.pause(); });
             playerRewindBtn.addEventListener('click', () => { audioElement.currentTime = Math.max(0, audioElement.currentTime - 15); updatePositionState(); });
             playerForwardBtn.addEventListener('click', () => { audioElement.currentTime = Math.min(audioElement.duration || 0, audioElement.currentTime + 30); updatePositionState(); });
-
-            progressContainer.addEventListener('click', (e) => {
-                if(!audioElement.duration) return;
-                const rect = progressContainer.getBoundingClientRect();
-                const percent = (e.clientX - rect.left) / rect.width;
-                audioElement.currentTime = percent * audioElement.duration;
+            progressContainer.addEventListener('click', e => { if (!isFinite(audioElement.duration)) return; const r = progressContainer.getBoundingClientRect(); audioElement.currentTime = ((e.clientX - r.left) / r.width) * audioElement.duration; updatePositionState(); });
+            
+            audioElement.addEventListener('play', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; navigator.mediaSession.playbackState = "playing"; });
+            audioElement.addEventListener('pause', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; navigator.mediaSession.playbackState = "paused"; });
+            audioElement.addEventListener('ended', () => { playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; currentPlaybackState = null; });
+            
+            audioElement.addEventListener('loadedmetadata', () => {
+                console.log("Metadatos cargados. Duración:", audioElement.duration);
+                durationEl.textContent = formatTime(audioElement.duration);
+                if (currentPlaybackState) {
+                    setupMediaSession(currentPlaybackState);
+                }
                 updatePositionState();
             });
-            
-            // <-- CAMBIO 3: El nuevo Event Listener que arregla la notificación
-            audioElement.addEventListener('durationchange', () => {
-                if (isFinite(audioElement.duration) && currentPlaybackState) {
-                    console.log(`Duración detectada: ${audioElement.duration}. Reconfigurando Media Session.`);
-                    setupMediaSession(currentPlaybackState);
-                    updatePositionState();
-                }
-            });
 
-            audioElement.addEventListener('play', () => { 
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; 
-                navigator.mediaSession.playbackState = "playing"; 
-            });
-            audioElement.addEventListener('pause', () => { 
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>'; 
-                navigator.mediaSession.playbackState = "paused"; 
-            });
-            audioElement.addEventListener('ended', () => { 
-                localStorage.removeItem('playbackState'); 
-                playerPlayPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-                currentPlaybackState = null;
-            });
-            
             audioElement.addEventListener('timeupdate', () => {
                 if (!isFinite(audioElement.duration)) return;
                 progressBar.style.width = `${(audioElement.currentTime / audioElement.duration) * 100}%`;
                 currentTimeEl.textContent = formatTime(audioElement.currentTime);
                 updatePositionState();
-                
-                if (currentPlaybackState) {
-                    const stateToSave = {
-                        ...currentPlaybackState,
-                        currentTime: audioElement.currentTime
-                    };
-                    localStorage.setItem('playbackState', JSON.stringify(stateToSave));
-                }
-            });
-
-            audioElement.addEventListener('loadedmetadata', () => {
-                durationEl.textContent = formatTime(audioElement.duration);
-                updatePositionState();
-            });
-            
-            audioElement.addEventListener('playing', () => {
-                if (currentPlaybackState) {
-                    const stateToSave = {
-                        ...currentPlaybackState,
-                        currentTime: audioElement.currentTime,
-                    };
-                    localStorage.setItem('playbackState', JSON.stringify(stateToSave));
-                }
             });
 
             // --- INICIALIZACIÓN ---
-            function init() {
-                renderPodcastsView();
-                restorePlaybackState();
-            }
-            init();
+            renderPodcastsView();
         });
     </script>
 </body>
