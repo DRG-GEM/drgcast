@@ -1,150 +1,238 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Podcast Player</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Prueba Podcast — Media Session</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #121212;
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-        padding: 1rem;
-    }
-    .player {
-        background: #1e1e1e;
-        border-radius: 20px;
-        padding: 20px;
-        max-width: 400px;
-        width: 100%;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-    .cover {
-        width: 100%;
-        border-radius: 15px;
-    }
-    h2 {
-        margin: 15px 0 5px;
-        font-size: 1.4rem;
-    }
-    p {
-        margin: 0;
-        color: #aaa;
-        font-size: 0.9rem;
-    }
-    .controls {
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        margin-top: 15px;
-    }
-    button {
-        background: #ff9800;
-        border: none;
-        padding: 10px;
-        border-radius: 50%;
-        cursor: pointer;
-        color: white;
-        font-size: 1.2rem;
-    }
-    button:hover {
-        background: #e68900;
-    }
-    input[type="range"] {
-        width: 100%;
-        margin-top: 15px;
-    }
+  :root{ --bg:#0f1724; --card:#111827; --accent:#f97316; --muted:#9aa4b2; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#0b1220,#0f1724); font-family:Inter,Arial,Helvetica,sans-serif; color:#fff; padding:16px; }
+  .card{ width:100%; max-width:420px; background:linear-gradient(180deg,var(--card),#0b1220); border-radius:14px; padding:16px; box-shadow:0 8px 30px rgba(2,6,23,0.6); }
+  .cover{ width:100%; border-radius:10px; display:block; }
+  h1{ margin:12px 0 4px; font-size:1.15rem; }
+  p.desc{ margin:0; color:var(--muted); font-size:0.9rem; }
+  .controls{ display:flex; gap:18px; justify-content:center; align-items:center; margin-top:12px; }
+  .btn{ background:linear-gradient(135deg,var(--accent),#ea580c); border:none; color:white; width:52px; height:52px; border-radius:999px; display:grid; place-items:center; font-size:18px; box-shadow:0 6px 18px rgba(234,88,12,0.18); }
+  .small-btn{ background:transparent; border:none; color:var(--muted); font-size:18px; width:40px; height:40px; display:grid; place-items:center; border-radius:8px; }
+  .progress-wrap{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .time{ font-size:12px; color:var(--muted); width:44px; text-align:center; }
+  input[type=range]{ flex:1; appearance:none; height:6px; border-radius:999px; background:#2a3340; }
+  input[type=range]::-webkit-slider-thumb{ appearance:none; width:14px; height:14px; border-radius:999px; background:var(--accent); box-shadow:0 2px 8px rgba(249,115,22,0.35); border:2px solid rgba(255,255,255,0.06); }
+  .debug{ margin-top:10px; font-size:12px; color:#cbd5e1; opacity:0.9; }
 </style>
 </head>
 <body>
+  <div class="card">
+    <img class="cover" id="cover" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Simpleicons_Business_podcast.svg/512px-Simpleicons_Business_podcast.svg.png" alt="portada">
+    <h1 id="title">Episodio 1 — El inicio</h1>
+    <p class="desc" id="podcast">Mi Podcast · Temporada 1</p>
 
-<div class="player">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Simpleicons_Business_podcast.svg/512px-Simpleicons_Business_podcast.svg.png" class="cover" alt="Portada">
-    <h2>Episodio 1: El inicio</h2>
-    <p>Descripción breve del episodio.</p>
+    <!-- Audio (ejemplo público). Cambia aquí la URL por la del episodio real -->
+    <audio id="audio" preload="metadata" crossorigin="anonymous"
+      src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
 
-    <audio id="audio" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
-
-    <div class="controls">
-        <button id="rewind">⏪</button>
-        <button id="play">▶️</button>
-        <button id="forward">⏩</button>
+    <div class="progress-wrap" aria-hidden="false">
+      <div class="time" id="current">0:00</div>
+      <input id="seek" type="range" min="0" max="100" value="0" step="0.1" />
+      <div class="time" id="duration">0:00</div>
     </div>
 
-    <input type="range" id="progress" value="0" min="0" max="100">
-</div>
+    <div class="controls">
+      <button class="small-btn" id="rew15" title="Retroceder 15s">⟲</button>
+      <button class="btn" id="play" title="Play/Pausa">▶</button>
+      <button class="small-btn" id="fwd30" title="Avanzar 30s">⟳</button>
+    </div>
+
+    <div class="debug" id="debug">Comprobando estado del media...</div>
+  </div>
 
 <script>
-    const audio = document.getElementById('audio');
-    const playBtn = document.getElementById('play');
-    const rewindBtn = document.getElementById('rewind');
-    const forwardBtn = document.getElementById('forward');
-    const progressBar = document.getElementById('progress');
+(function(){
+  const audio = document.getElementById('audio');
+  const playBtn = document.getElementById('play');
+  const rewindBtn = document.getElementById('rew15');
+  const forwardBtn = document.getElementById('fwd30');
+  const seek = document.getElementById('seek');
+  const currentEl = document.getElementById('current');
+  const durationEl = document.getElementById('duration');
+  const debugEl = document.getElementById('debug');
 
-    let isPlaying = false;
+  let positionUpdater = null;
+  let isPlaying = false;
 
-    playBtn.addEventListener('click', () => {
-        if (isPlaying) {
-            audio.pause();
-            playBtn.textContent = '▶️';
-        } else {
-            audio.play();
-            playBtn.textContent = '⏸️';
-        }
-        isPlaying = !isPlaying;
-    });
+  function formatTime(s){
+    if (!isFinite(s)) return '0:00';
+    const m = Math.floor(s/60);
+    const secs = Math.floor(s%60);
+    return `${m}:${secs<10?'0':''}${secs}`;
+  }
 
-    rewindBtn.addEventListener('click', () => {
-        audio.currentTime = Math.max(audio.currentTime - 15, 0);
-    });
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
-    forwardBtn.addEventListener('click', () => {
-        audio.currentTime = Math.min(audio.currentTime + 30, audio.duration);
-    });
-
-    audio.addEventListener('timeupdate', () => {
-        progressBar.value = (audio.currentTime / audio.duration) * 100;
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.setPositionState({
-                duration: audio.duration,
-                playbackRate: audio.playbackRate,
-                position: audio.currentTime
-            });
-        }
-    });
-
-    progressBar.addEventListener('input', () => {
-        audio.currentTime = (progressBar.value / 100) * audio.duration;
-    });
-
-    if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: 'Episodio 1: El inicio',
-            artist: 'Mi Podcast',
-            album: 'Temporada 1',
-            artwork: [
-                { src: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Simpleicons_Business_podcast.svg/512px-Simpleicons_Business_podcast.svg.png', sizes: '512x512', type: 'image/png' }
-            ]
-        });
-
-        navigator.mediaSession.setActionHandler('play', () => { audio.play(); isPlaying = true; playBtn.textContent = '⏸️'; });
-        navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); isPlaying = false; playBtn.textContent = '▶️'; });
-        navigator.mediaSession.setActionHandler('seekbackward', () => { audio.currentTime = Math.max(audio.currentTime - 15, 0); });
-        navigator.mediaSession.setActionHandler('seekforward', () => { audio.currentTime = Math.min(audio.currentTime + 30, audio.duration); });
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (details.fastSeek && 'fastSeek' in audio) {
-                audio.fastSeek(details.seekTime);
-                return;
-            }
-            audio.currentTime = details.seekTime;
-        });
+  // Actualiza el positionState (notificación) si está disponible
+  function updatePositionState(){
+    if (!('mediaSession' in navigator)) return;
+    if (typeof navigator.mediaSession.setPositionState !== 'function') return;
+    if (!isFinite(audio.duration)) return;
+    try{
+      navigator.mediaSession.setPositionState({
+        duration: audio.duration,
+        playbackRate: audio.playbackRate || 1,
+        position: audio.currentTime
+      });
+    }catch(e){
+      console.warn('setPositionState fallo', e);
     }
-</script>
+  }
 
+  function startPositionUpdater(){
+    stopPositionUpdater();
+    updatePositionState();
+    positionUpdater = setInterval(updatePositionState, 1000);
+  }
+  function stopPositionUpdater(){ if(positionUpdater) { clearInterval(positionUpdater); positionUpdater = null; } }
+
+  // Reproducción / pause UI
+  playBtn.addEventListener('click', async () => {
+    if (audio.paused) {
+      try {
+        await audio.play();
+      } catch(e){ console.error('play error', e); }
+    } else {
+      audio.pause();
+    }
+  });
+
+  rewindBtn.addEventListener('click', () => updateSeekBy(-15));
+  forwardBtn.addEventListener('click', () => updateSeekBy(30));
+
+  function updateSeekBy(sec){
+    if (!isFinite(audio.duration)) return;
+    audio.currentTime = clamp(audio.currentTime + sec, 0, audio.duration);
+    // actualizar UI inmediatamente
+    updateUI();
+    updatePositionState();
+  }
+
+  // barra de progreso
+  seek.addEventListener('input', () => {
+    if (!isFinite(audio.duration)) return;
+    audio.currentTime = (seek.value/100) * audio.duration;
+    updateUI();
+    updatePositionState();
+  });
+
+  audio.addEventListener('loadedmetadata', () => {
+    durationEl.textContent = formatTime(audio.duration);
+    // show if stream is seekable
+    const seekable = audio.seekable && audio.seekable.length > 0;
+    debugEl.textContent = `Duración: ${isFinite(audio.duration)?formatTime(audio.duration):'desconocida'} — Seekable: ${seekable ? 'sí' : 'no'}`;
+    updateUI();
+    updatePositionState();
+  });
+
+  audio.addEventListener('timeupdate', () => {
+    updateUI();
+    // no llamamos setPositionState en cada timeupdate (lo hacemos por interval) pero actualizamos por si
+    if (Date.now() % 2 === 0) updatePositionState();
+  });
+
+  audio.addEventListener('play', () => {
+    isPlaying = true;
+    playBtn.textContent = '⏸';
+    navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
+    startPositionUpdater();
+  });
+  audio.addEventListener('pause', () => {
+    isPlaying = false;
+    playBtn.textContent = '▶';
+    navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
+    stopPositionUpdater();
+  });
+  audio.addEventListener('ended', () => {
+    isPlaying = false;
+    playBtn.textContent = '▶';
+    navigator.mediaSession && (navigator.mediaSession.playbackState = 'none');
+    stopPositionUpdater();
+  });
+
+  function updateUI(){
+    currentEl.textContent = formatTime(audio.currentTime);
+    durationEl.textContent = isFinite(audio.duration) ? formatTime(audio.duration) : '0:00';
+    if (isFinite(audio.duration) && audio.duration > 0){
+      seek.value = (audio.currentTime / audio.duration) * 100;
+    } else {
+      seek.value = 0;
+    }
+  }
+
+  // --- Media Session (notificación) ---
+  function setupMediaSession(){
+    if (!('mediaSession' in navigator)) {
+      debugEl.textContent += ' — MediaSession no soportado en este entorno.';
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: 'Episodio 1 — El inicio',
+      artist: 'Mi Podcast',
+      album: 'Temporada 1',
+      artwork: [
+        { src: document.getElementById('cover').src,   sizes: '512x512', type: 'image/png' }
+      ]
+    });
+
+    // Acciones básicas
+    navigator.mediaSession.setActionHandler('play', () => audio.play());
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+
+    // Seek handlers (cuando el UA los soporte, mostrarán controles de seek)
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      const offset = (details && details.seekOffset) ? details.seekOffset : 15;
+      updateSeekBy(-offset);
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      const offset = (details && details.seekOffset) ? details.seekOffset : 30;
+      updateSeekBy(offset);
+    });
+
+    // Además registramos prev/next por compatibilidad con notificaciones que muestran esos botones
+    navigator.mediaSession.setActionHandler('previoustrack', () => updateSeekBy(-15));
+    navigator.mediaSession.setActionHandler('nexttrack', () => updateSeekBy(30));
+
+    // SeekTo (barra de progreso del sistema)
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details && typeof details.seekTime === 'number') {
+        if (details.fastSeek && 'fastSeek' in audio) {
+          audio.fastSeek(details.seekTime);
+        } else {
+          audio.currentTime = clamp(details.seekTime, 0, audio.duration || Number.MAX_VALUE);
+        }
+        updateUI();
+        updatePositionState();
+      }
+    });
+
+    debugEl.textContent += ' — MediaSession inicializada.';
+  }
+
+  // Inicialización
+  setupMediaSession();
+  updateUI();
+
+  // Debug: mostrar seekable en la consola (útil para saber si la notificación mostrará controles)
+  audio.addEventListener('loadedmetadata', () => {
+    console.log('audio.seekable.length =', audio.seekable ? audio.seekable.length : 0);
+    if (audio.seekable && audio.seekable.length > 0) {
+      console.log('Rango seekable disponible:', audio.seekable);
+    } else {
+      console.log('No hay rangos seekable. Algunos UAs pueden ocultar controles de avance/retroceso.');
+    }
+  });
+
+  // Nota: si la notificación sigue sin mostrar botones, prueba abrir el sitio en Chrome (no en WebView)
+  // y también prueba instalando la PWA (añadir a pantalla). Algunos webviews o capas del fabricante limitan la UI.
+})();
+</script>
 </body>
 </html>
