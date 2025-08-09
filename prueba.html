@@ -1,238 +1,140 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Prueba Podcast — Media Session</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Podcast Player</title>
 <style>
-  :root{ --bg:#0f1724; --card:#111827; --accent:#f97316; --muted:#9aa4b2; }
-  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#0b1220,#0f1724); font-family:Inter,Arial,Helvetica,sans-serif; color:#fff; padding:16px; }
-  .card{ width:100%; max-width:420px; background:linear-gradient(180deg,var(--card),#0b1220); border-radius:14px; padding:16px; box-shadow:0 8px 30px rgba(2,6,23,0.6); }
-  .cover{ width:100%; border-radius:10px; display:block; }
-  h1{ margin:12px 0 4px; font-size:1.15rem; }
-  p.desc{ margin:0; color:var(--muted); font-size:0.9rem; }
-  .controls{ display:flex; gap:18px; justify-content:center; align-items:center; margin-top:12px; }
-  .btn{ background:linear-gradient(135deg,var(--accent),#ea580c); border:none; color:white; width:52px; height:52px; border-radius:999px; display:grid; place-items:center; font-size:18px; box-shadow:0 6px 18px rgba(234,88,12,0.18); }
-  .small-btn{ background:transparent; border:none; color:var(--muted); font-size:18px; width:40px; height:40px; display:grid; place-items:center; border-radius:8px; }
-  .progress-wrap{ display:flex; align-items:center; gap:10px; margin-top:12px; }
-  .time{ font-size:12px; color:var(--muted); width:44px; text-align:center; }
-  input[type=range]{ flex:1; appearance:none; height:6px; border-radius:999px; background:#2a3340; }
-  input[type=range]::-webkit-slider-thumb{ appearance:none; width:14px; height:14px; border-radius:999px; background:var(--accent); box-shadow:0 2px 8px rgba(249,115,22,0.35); border:2px solid rgba(255,255,255,0.06); }
-  .debug{ margin-top:10px; font-size:12px; color:#cbd5e1; opacity:0.9; }
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: #121212;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .player {
+        max-width: 400px;
+        width: 100%;
+        background: #1e1e1e;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .title {
+        font-size: 1.2rem;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    .controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 15px;
+    }
+    button {
+        background: #ff9800;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 50%;
+        margin: 0 10px;
+        font-size: 1.2rem;
+        cursor: pointer;
+    }
+    button:hover {
+        background: #e68900;
+    }
+    input[type="range"] {
+        width: 100%;
+        margin-top: 15px;
+    }
 </style>
 </head>
 <body>
-  <div class="card">
-    <img class="cover" id="cover" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Simpleicons_Business_podcast.svg/512px-Simpleicons_Business_podcast.svg.png" alt="portada">
-    <h1 id="title">Episodio 1 — El inicio</h1>
-    <p class="desc" id="podcast">Mi Podcast · Temporada 1</p>
 
-    <!-- Audio (ejemplo público). Cambia aquí la URL por la del episodio real -->
-    <audio id="audio" preload="metadata" crossorigin="anonymous"
-      src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
-
-    <div class="progress-wrap" aria-hidden="false">
-      <div class="time" id="current">0:00</div>
-      <input id="seek" type="range" min="0" max="100" value="0" step="0.1" />
-      <div class="time" id="duration">0:00</div>
-    </div>
-
+<div class="player">
+    <div class="title">🎧 Episodio de prueba</div>
+    <audio id="audio" preload="metadata">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        Tu navegador no soporta audio.
+    </audio>
+    
+    <input type="range" id="progress" value="0" min="0" max="100">
+    
     <div class="controls">
-      <button class="small-btn" id="rew15" title="Retroceder 15s">⟲</button>
-      <button class="btn" id="play" title="Play/Pausa">▶</button>
-      <button class="small-btn" id="fwd30" title="Avanzar 30s">⟳</button>
+        <button id="backward">⏪</button>
+        <button id="play">▶️</button>
+        <button id="forward">⏩</button>
     </div>
-
-    <div class="debug" id="debug">Comprobando estado del media...</div>
-  </div>
+</div>
 
 <script>
-(function(){
-  const audio = document.getElementById('audio');
-  const playBtn = document.getElementById('play');
-  const rewindBtn = document.getElementById('rew15');
-  const forwardBtn = document.getElementById('fwd30');
-  const seek = document.getElementById('seek');
-  const currentEl = document.getElementById('current');
-  const durationEl = document.getElementById('duration');
-  const debugEl = document.getElementById('debug');
+const audio = document.getElementById("audio");
+const playBtn = document.getElementById("play");
+const progress = document.getElementById("progress");
+const backwardBtn = document.getElementById("backward");
+const forwardBtn = document.getElementById("forward");
 
-  let positionUpdater = null;
-  let isPlaying = false;
-
-  function formatTime(s){
-    if (!isFinite(s)) return '0:00';
-    const m = Math.floor(s/60);
-    const secs = Math.floor(s%60);
-    return `${m}:${secs<10?'0':''}${secs}`;
-  }
-
-  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-  // Actualiza el positionState (notificación) si está disponible
-  function updatePositionState(){
-    if (!('mediaSession' in navigator)) return;
-    if (typeof navigator.mediaSession.setPositionState !== 'function') return;
-    if (!isFinite(audio.duration)) return;
-    try{
-      navigator.mediaSession.setPositionState({
-        duration: audio.duration,
-        playbackRate: audio.playbackRate || 1,
-        position: audio.currentTime
-      });
-    }catch(e){
-      console.warn('setPositionState fallo', e);
-    }
-  }
-
-  function startPositionUpdater(){
-    stopPositionUpdater();
-    updatePositionState();
-    positionUpdater = setInterval(updatePositionState, 1000);
-  }
-  function stopPositionUpdater(){ if(positionUpdater) { clearInterval(positionUpdater); positionUpdater = null; } }
-
-  // Reproducción / pause UI
-  playBtn.addEventListener('click', async () => {
+// Play / Pause
+playBtn.addEventListener("click", () => {
     if (audio.paused) {
-      try {
-        await audio.play();
-      } catch(e){ console.error('play error', e); }
+        audio.play();
+        playBtn.textContent = "⏸️";
     } else {
-      audio.pause();
+        audio.pause();
+        playBtn.textContent = "▶️";
     }
-  });
+});
 
-  rewindBtn.addEventListener('click', () => updateSeekBy(-15));
-  forwardBtn.addEventListener('click', () => updateSeekBy(30));
+// Actualizar barra de progreso
+audio.addEventListener("timeupdate", () => {
+    progress.value = (audio.currentTime / audio.duration) * 100;
+});
 
-  function updateSeekBy(sec){
-    if (!isFinite(audio.duration)) return;
-    audio.currentTime = clamp(audio.currentTime + sec, 0, audio.duration);
-    // actualizar UI inmediatamente
-    updateUI();
-    updatePositionState();
-  }
+// Saltar a un punto del audio
+progress.addEventListener("input", () => {
+    audio.currentTime = (progress.value / 100) * audio.duration;
+});
 
-  // barra de progreso
-  seek.addEventListener('input', () => {
-    if (!isFinite(audio.duration)) return;
-    audio.currentTime = (seek.value/100) * audio.duration;
-    updateUI();
-    updatePositionState();
-  });
+// Retroceder 15s
+backwardBtn.addEventListener("click", () => {
+    audio.currentTime = Math.max(0, audio.currentTime - 15);
+});
 
-  audio.addEventListener('loadedmetadata', () => {
-    durationEl.textContent = formatTime(audio.duration);
-    // show if stream is seekable
-    const seekable = audio.seekable && audio.seekable.length > 0;
-    debugEl.textContent = `Duración: ${isFinite(audio.duration)?formatTime(audio.duration):'desconocida'} — Seekable: ${seekable ? 'sí' : 'no'}`;
-    updateUI();
-    updatePositionState();
-  });
+// Avanzar 30s
+forwardBtn.addEventListener("click", () => {
+    audio.currentTime = Math.min(audio.duration, audio.currentTime + 30);
+});
 
-  audio.addEventListener('timeupdate', () => {
-    updateUI();
-    // no llamamos setPositionState en cada timeupdate (lo hacemos por interval) pero actualizamos por si
-    if (Date.now() % 2 === 0) updatePositionState();
-  });
-
-  audio.addEventListener('play', () => {
-    isPlaying = true;
-    playBtn.textContent = '⏸';
-    navigator.mediaSession && (navigator.mediaSession.playbackState = 'playing');
-    startPositionUpdater();
-  });
-  audio.addEventListener('pause', () => {
-    isPlaying = false;
-    playBtn.textContent = '▶';
-    navigator.mediaSession && (navigator.mediaSession.playbackState = 'paused');
-    stopPositionUpdater();
-  });
-  audio.addEventListener('ended', () => {
-    isPlaying = false;
-    playBtn.textContent = '▶';
-    navigator.mediaSession && (navigator.mediaSession.playbackState = 'none');
-    stopPositionUpdater();
-  });
-
-  function updateUI(){
-    currentEl.textContent = formatTime(audio.currentTime);
-    durationEl.textContent = isFinite(audio.duration) ? formatTime(audio.duration) : '0:00';
-    if (isFinite(audio.duration) && audio.duration > 0){
-      seek.value = (audio.currentTime / audio.duration) * 100;
-    } else {
-      seek.value = 0;
-    }
-  }
-
-  // --- Media Session (notificación) ---
-  function setupMediaSession(){
-    if (!('mediaSession' in navigator)) {
-      debugEl.textContent += ' — MediaSession no soportado en este entorno.';
-      return;
-    }
-
+// Media Session API para Android
+if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: 'Episodio 1 — El inicio',
-      artist: 'Mi Podcast',
-      album: 'Temporada 1',
-      artwork: [
-        { src: document.getElementById('cover').src,   sizes: '512x512', type: 'image/png' }
-      ]
+        title: "Episodio de prueba",
+        artist: "Podcast Demo",
+        artwork: [
+            { src: "https://via.placeholder.com/300.png/09f/fff", sizes: "300x300", type: "image/png" }
+        ]
     });
 
-    // Acciones básicas
-    navigator.mediaSession.setActionHandler('play', () => audio.play());
-    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-
-    // Seek handlers (cuando el UA los soporte, mostrarán controles de seek)
-    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-      const offset = (details && details.seekOffset) ? details.seekOffset : 15;
-      updateSeekBy(-offset);
+    navigator.mediaSession.setActionHandler("play", () => {
+        audio.play();
+        playBtn.textContent = "⏸️";
     });
-    navigator.mediaSession.setActionHandler('seekforward', (details) => {
-      const offset = (details && details.seekOffset) ? details.seekOffset : 30;
-      updateSeekBy(offset);
+    navigator.mediaSession.setActionHandler("pause", () => {
+        audio.pause();
+        playBtn.textContent = "▶️";
     });
-
-    // Además registramos prev/next por compatibilidad con notificaciones que muestran esos botones
-    navigator.mediaSession.setActionHandler('previoustrack', () => updateSeekBy(-15));
-    navigator.mediaSession.setActionHandler('nexttrack', () => updateSeekBy(30));
-
-    // SeekTo (barra de progreso del sistema)
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details && typeof details.seekTime === 'number') {
-        if (details.fastSeek && 'fastSeek' in audio) {
-          audio.fastSeek(details.seekTime);
-        } else {
-          audio.currentTime = clamp(details.seekTime, 0, audio.duration || Number.MAX_VALUE);
-        }
-        updateUI();
-        updatePositionState();
-      }
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+        audio.currentTime = Math.max(0, audio.currentTime - 15);
     });
-
-    debugEl.textContent += ' — MediaSession inicializada.';
-  }
-
-  // Inicialización
-  setupMediaSession();
-  updateUI();
-
-  // Debug: mostrar seekable en la consola (útil para saber si la notificación mostrará controles)
-  audio.addEventListener('loadedmetadata', () => {
-    console.log('audio.seekable.length =', audio.seekable ? audio.seekable.length : 0);
-    if (audio.seekable && audio.seekable.length > 0) {
-      console.log('Rango seekable disponible:', audio.seekable);
-    } else {
-      console.log('No hay rangos seekable. Algunos UAs pueden ocultar controles de avance/retroceso.');
-    }
-  });
-
-  // Nota: si la notificación sigue sin mostrar botones, prueba abrir el sitio en Chrome (no en WebView)
-  // y también prueba instalando la PWA (añadir a pantalla). Algunos webviews o capas del fabricante limitan la UI.
-})();
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+        audio.currentTime = Math.min(audio.duration, audio.currentTime + 30);
+    });
+}
 </script>
+
 </body>
 </html>
