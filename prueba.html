@@ -3,136 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Podcast Player</title>
+<title>Reproductor con MediaSession</title>
 <style>
     body {
         font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background: #121212;
-        color: #fff;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .player {
-        max-width: 400px;
-        width: 100%;
-        background: #1e1e1e;
-        border-radius: 15px;
-        padding: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    }
-    .title {
-        font-size: 1.2rem;
-        margin-bottom: 10px;
+        background-color: #121212;
+        color: white;
         text-align: center;
+        padding: 20px;
     }
-    .controls {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-top: 15px;
+    audio {
+        width: 100%;
+        margin-top: 20px;
     }
     button {
-        background: #ff9800;
-        border: none;
-        color: white;
+        margin: 10px;
         padding: 10px 15px;
-        border-radius: 50%;
-        margin: 0 10px;
-        font-size: 1.2rem;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background: #1db954;
+        color: white;
         cursor: pointer;
     }
     button:hover {
-        background: #e68900;
-    }
-    input[type="range"] {
-        width: 100%;
-        margin-top: 15px;
+        background: #1aa34a;
     }
 </style>
 </head>
 <body>
 
-<div class="player">
-    <div class="title">🎧 Episodio de prueba</div>
-    <audio id="audio" preload="metadata">
-        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
-        Tu navegador no soporta audio.
-    </audio>
-    
-    <input type="range" id="progress" value="0" min="0" max="100">
-    
-    <div class="controls">
-        <button id="backward">⏪</button>
-        <button id="play">▶️</button>
-        <button id="forward">⏩</button>
-    </div>
-</div>
+<h1>🎵 Mi Podcast</h1>
+<audio id="player" controls>
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+    Tu navegador no soporta audio.
+</audio>
 
 <script>
-const audio = document.getElementById("audio");
-const playBtn = document.getElementById("play");
-const progress = document.getElementById("progress");
-const backwardBtn = document.getElementById("backward");
-const forwardBtn = document.getElementById("forward");
+const player = document.getElementById('player');
 
-// Play / Pause
-playBtn.addEventListener("click", () => {
-    if (audio.paused) {
-        audio.play();
-        playBtn.textContent = "⏸️";
-    } else {
-        audio.pause();
-        playBtn.textContent = "▶️";
-    }
-});
-
-// Actualizar barra de progreso
-audio.addEventListener("timeupdate", () => {
-    progress.value = (audio.currentTime / audio.duration) * 100;
-});
-
-// Saltar a un punto del audio
-progress.addEventListener("input", () => {
-    audio.currentTime = (progress.value / 100) * audio.duration;
-});
-
-// Retroceder 15s
-backwardBtn.addEventListener("click", () => {
-    audio.currentTime = Math.max(0, audio.currentTime - 15);
-});
-
-// Avanzar 30s
-forwardBtn.addEventListener("click", () => {
-    audio.currentTime = Math.min(audio.duration, audio.currentTime + 30);
-});
-
-// Media Session API para Android
 if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
-        title: "Episodio de prueba",
-        artist: "Podcast Demo",
+        title: 'Episodio 1',
+        artist: 'Mi Podcast',
+        album: 'Temporada 1',
         artwork: [
-            { src: "https://via.placeholder.com/300.png/09f/fff", sizes: "300x300", type: "image/png" }
+            { src: 'https://via.placeholder.com/96',   sizes: '96x96',   type: 'image/png' },
+            { src: 'https://via.placeholder.com/128',  sizes: '128x128', type: 'image/png' },
+            { src: 'https://via.placeholder.com/192',  sizes: '192x192', type: 'image/png' },
+            { src: 'https://via.placeholder.com/256',  sizes: '256x256', type: 'image/png' }
         ]
     });
 
-    navigator.mediaSession.setActionHandler("play", () => {
-        audio.play();
-        playBtn.textContent = "⏸️";
-    });
-    navigator.mediaSession.setActionHandler("pause", () => {
-        audio.pause();
-        playBtn.textContent = "▶️";
-    });
-    navigator.mediaSession.setActionHandler("seekbackward", () => {
-        audio.currentTime = Math.max(0, audio.currentTime - 15);
-    });
-    navigator.mediaSession.setActionHandler("seekforward", () => {
-        audio.currentTime = Math.min(audio.duration, audio.currentTime + 30);
-    });
+    navigator.mediaSession.setActionHandler('play', () => player.play());
+    navigator.mediaSession.setActionHandler('pause', () => player.pause());
+    navigator.mediaSession.setActionHandler('seekbackward', () => player.currentTime -= 10);
+    navigator.mediaSession.setActionHandler('seekforward', () => player.currentTime += 10);
+    navigator.mediaSession.setActionHandler('previoustrack', () => console.log('Pista anterior'));
+    navigator.mediaSession.setActionHandler('nexttrack', () => console.log('Pista siguiente'));
 }
 </script>
 
